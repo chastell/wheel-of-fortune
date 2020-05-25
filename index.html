@@ -1,0 +1,20 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset='utf-8'>
+    <title>Wof Elm</title>
+    <link rel="stylesheet" href="https://unpkg.com/purecss@2.0.3/build/pure-min.css" integrity="sha384-cg6SkqEOCV1NbJoCu11+bm0NvBRc8IYLRGXkmNrqUBfTjmMYwNKPWBTIKyw9mHNJ" crossorigin="anonymous">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="main.css"/>
+  </head>
+  <body>
+    <div class="pure-g">
+      <app/>
+    </div>
+    <script src="main.js"></script>
+    <script type="text/javascript">
+      const elem = document.querySelector('app')
+      const app = Elm.Main.init({node: elem})
+    </script>
+  </body>
+</html>

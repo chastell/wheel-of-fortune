@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "elm-format": "^0.8.3",
+    "elm-oracle": "^1.1.1"
+  }
+}
