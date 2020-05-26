@@ -11,33 +11,33 @@ vowelCost = 200
 
 acceptConsonant : Char -> GameState -> (GameState, Cmd msg)
 acceptConsonant letter state =
-  let used = log "used" state.lettersUsed
+  let used = state.lettersUsed
       -- if we're here, wheel state is definitely ok. But cannot express that via type system yet :(
-      wheel = log "wheel" (Maybe.withDefault (Guess 0) state.wheelState)
-      le_ = log "acl" letter
-      st_ = log "acst" state
+      wheel = (Maybe.withDefault (Guess 0) state.wheelState)
+      letterScore = (calculateScore letter state.puzzle wheel)
   in
       if member letter used then
-        (log "used" { state | playerState = TurnLost }, Cmd.none)
+        ({ state | playerState = TurnLost }, Cmd.none)
       else if member letter vowels then
-        (log "vwl" { state | playerState = TurnLost }, Cmd.none)
+        ({ state | playerState = TurnLost }, Cmd.none)
       else
-        (log "yes" { state |
+        ({ state |
           playerState = ChooseAction,
           lettersUsed = letter :: state.lettersUsed,
-          players = updateScore state.players state.currentPlayer (calculateScore letter state.puzzle wheel)
+          players = updateScore state.players state.currentPlayer letterScore
         } , Cmd.none)
 
 acceptVowel : Char -> GameState -> (GameState, Cmd msg)
 acceptVowel letter state =
   let used = state.lettersUsed
-      le_ = log "avl" letter
-      st_ = log "avst" state
   in
       if member letter used then
         ({ state | playerState = TurnLost }, Cmd.none)
       else if not (member letter vowels) then
         ({ state | playerState = TurnLost }, Cmd.none)
       else
-        ({state | playerState = SpinOrGuess}, Cmd.none)
+        ({state | playerState = SpinOrGuess,
+          lettersUsed = letter :: state.lettersUsed,
+          players = updateScore state.players state.currentPlayer -vowelCost
+        }, Cmd.none)
 
