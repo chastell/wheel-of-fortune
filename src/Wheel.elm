@@ -8,15 +8,16 @@ import Svg.Attributes as SA
 import List exposing (length, range, indexedMap, foldl, concatMap, append)
 import Array exposing (Array, get)
 import String exposing (fromFloat, fromInt)
+import Debug exposing (log)
 
-theWheel: WheelDef -> Html msg
-theWheel defn =
+theWheel: WheelDef -> Int -> RotationTarget -> Html msg
+theWheel defn current target =
   node "wof-container" [ class "pure-u-1" ] [
     peg,
     node "wof" [] [
       svg [ SA.id "circle", SA.class "pure-u-1",
             SA.width "200", SA.height "200", SA.viewBox "-1 -1 2 2" ]
-          [ textStyles, (wheelAndText defn), innerCircle ]
+          [ textStyles, (wheelAndText defn current target), innerCircle ]
       ]
   ]
 
@@ -30,9 +31,8 @@ textStyles = style [] [
 
 innerCircle = circle [ SA.cx "0", SA.cy "0", SA.r "0.4", SA.fill transparency ] []
 
--- NOTE: transform should be set to bias value, and then we rotate the svg itself?
-wheelAndText : WheelDef -> Svg msg
-wheelAndText defn = 
+wheelAndText : WheelDef -> Int -> RotationTarget -> Svg msg
+wheelAndText defn current target = 
   let numSectors = Array.length defn.sectors
       angle = (2 * pi) / (toFloat numSectors)
       bias = -pi / 2.0 - angle / 2.0
@@ -41,17 +41,42 @@ wheelAndText defn =
       listSectors = (Array.toList defn.sectors)
       sectors = (indexedMap (sectorSlice defn.palette angle) listSectors )
       labels = (indexedMap (sectorLabel defn.palette angle) listSectors)
-      animations = makeAnimations
+      animations = makeAnimations current target numSectors angle bias
   in
   g [ SA.id "wheel-and-text", SA.transform initialRotation ]
    (List.concat [sectors, labels, animations])
   
+rotationAnim from to begin dur extra =
+  animateTransform (List.append [ SA.attributeName "transform", SA.type_ "rotate",
+                                  SA.begin begin, SA.dur dur, SA.from from, SA.to to ] extra) []
 
-makeAnimations : List (Svg msg)
-makeAnimations = 
-  [ animateTransform [ SA.attributeName "transform", SA.type_ "rotate",
-  SA.begin "0s", SA.dur "500ms", SA.from "0", SA.to "360",
-  SA.repeatCount "indefinite"] [] ]
+-- NOTE: could take a List/Array WheelSector instead
+-- Return new global state which contains a list of animations
+-- to apply on the wheel. To match the js version:
+-- 1. a fast rotation from current angle to 360
+-- 2. two medium full rots
+-- 3. slow rot to designated position
+makeAnimations : Int -> RotationTarget -> Int -> Float -> Float ->  List (Svg msg)
+makeAnimations current target num angle bias = 
+    case target of
+      Just index ->
+        if index == current then
+          []
+        else
+          let currentAngle = log "currentAngle" (angle * (toFloat current) + bias)
+              currentAngleDeg = log "currentAngleDeg" (180 * currentAngle / pi)
+              targetAngle = log "targetAngle" (angle * (toFloat -index) + bias)
+              targetAngleDeg = log "targetAngleDeg" (180 * targetAngle / pi)
+              dur = (3000 * (abs targetAngle) / pi)
+          in
+              [ rotationAnim (fromFloat currentAngleDeg) "-360" "1000ms" "2000ms" [ SA.calcMode "spline", SA.keySplines "0.32 0 0.67 0", SA.keyTimes "0 ; 1" ],
+                rotationAnim "0" "-360" "3000ms" "2000ms" [],
+                -- freeze is the key to make this work, otherwise animation resets
+                -- duration here should not be fixed but depend on circle left
+                rotationAnim "0" (fromFloat targetAngleDeg) "5000ms" ((fromFloat dur) ++ "ms") [ SA.fill "freeze", SA.calcMode "spline", SA.keySplines "0.16 1 0.3 1", SA.keyTimes "0;1" ] 
+                ]
+      Nothing -> []
+  
 
 sectorSlice: (Array ColorDef) -> Float -> Int -> WheelSector -> Svg msg
 sectorSlice palette angle num content =
@@ -122,13 +147,7 @@ getFill colors i =
         Just (color, fill) -> fill
         _ -> ""
 
-
--- NOTE: could take a List/Array WheelSector instead
--- Return new global state which contains a list of animations
--- to apply on the wheel. To match the js version:
--- 1. a fast rotation from current angle to 360
--- 2. two medium full rots
--- 3. slow rot to designated position
+-- use state's RNG and set a new target, which will then be picked up by animation routines
 spinWheel : WheelDef -> PlayerState
 spinWheel wheel =
   Spinning
