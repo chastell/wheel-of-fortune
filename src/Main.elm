@@ -14,7 +14,20 @@ import Json.Decode as Decode
 import Debug exposing (log)
 
 
-wheelDefinition = { sectors = Array.fromList [ Guess 100, Guess 250, Guess 500, Guess 150, Guess 300, Guess 1500, Bankrupt, Guess 400, Guess 200, Guess 500, Halt ],
+wheelDefinition = { sectors = Array.fromList [ Guess 100,
+                                               Guess 250,
+                                               Guess 500,
+                                               Guess 150,
+                                               Guess 300,
+                                               Guess 1500,
+                                               Bankrupt,
+                                               Guess 400,
+                                               Guess 200,
+                                               Guess 500,
+                                               Halt,
+                                               Guess 350,
+                                               Guess 450,
+                                               WildCard ],
                     palette = Array.fromList [
                       ("#729ea1", "dark"),
                       ("#b5bd89", "dark"),
@@ -29,12 +42,16 @@ wheelDefinition = { sectors = Array.fromList [ Guess 100, Guess 250, Guess 500, 
 main = Browser.element { init = init, update = update, view = view, subscriptions = subscriptions }
 
 init : () -> ( GameState, Cmd msg )
-init _ = ( { players = [], currentPlayer = -1, playerState = SpinSuccessConsonant,
-              wheelState = Nothing,
-              lettersUsed = [],
-              puzzle = [ "..BĘDZIE.WAS..", "..PIS.RUCHAŁ..", "....W.DUPĘ...."],
-              category = "Powiedzenie" },
-              Cmd.none )
+init _ = ( { players = [],
+             currentPlayer = -1, playerState = BeforeSpin,
+             current = 0,
+             wheelState = Array.get 0 wheelDefinition.sectors,
+             lettersUsed = [],
+             puzzle = [ "..BĘDZIE.WAS..", "..PIS.RUCHAŁ..", "....W.DUPĘ...."],
+             category = "Powiedzenie",
+             target = Just 9
+             },
+           Cmd.none )
 
 update : Msg -> GameState -> ( GameState, Cmd msg )
 update msg state =
@@ -47,8 +64,6 @@ update msg state =
 handleLetterKey : GameState -> Char -> ( GameState, Cmd msg )
 handleLetterKey state char =
   let playerState = state.playerState
-      l_ = log "hlk state" state
-      c_ = log "hlk char" char
   in
   case playerState of
     -- accept, pass to letter finder
@@ -64,7 +79,7 @@ view state =
   node "main" [class "pure-u-20-24"] [
     (categoryDisplay state.category),
     (letterGrid state.puzzle state.lettersUsed),
-    (theWheel wheelDefinition)
+    (theWheel wheelDefinition state.current state.target)
   ]
 
 launchSpin : GameState -> ( GameState, Cmd msg)
@@ -92,6 +107,7 @@ keyDecoder =
 toKey : String -> Msg
 toKey inp =
   case String.uncons inp of
+    -- Funky syntax, but useful for pattern matching on single character
     Just ( ' ', "" ) -> NextPlayerCommand
     Just ( 'E', "nter" ) -> SpinCommand
     Just ( '!', "") -> RevealCommand

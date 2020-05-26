@@ -20,7 +20,11 @@ type alias GameState = { players : List Player,
                          lettersUsed : List Char,
                          puzzle: List String,
                          category: String,
-                         wheelState : Maybe WheelSector
+                         current: Int,
+                         -- NOTE: this is just (get current wheelDefinition.sectors)
+                         wheelState : Maybe WheelSector,
+                         -- NOTE: this is just the index of wheelState's sector
+                         target: RotationTarget
                        }
 
 type Msg = NoOp 
@@ -40,6 +44,8 @@ type WheelSector = Guess Int
 type alias ColorDef = (String, String)
 
 type alias WheelDef = { sectors: Array WheelSector, palette: Array ColorDef }
+
+type alias RotationTarget = Maybe Int
 
 -- not a type, but useful to many modules
 
