@@ -1,16 +1,18 @@
-module Wheel exposing (theWheel, spinWheel)
+module Wheel exposing (theWheel)
 
 import Types exposing (..)
 import Html exposing (Html, node)
 import Html.Attributes exposing (class, id)
 import Svg exposing (Svg, svg, path, style, text, text_, g, circle, animateTransform)
 import Svg.Attributes as SA
+import Svg.Events as SE
 import List exposing (length, range, indexedMap, foldl, concatMap, append)
 import Array exposing (Array, get)
 import String exposing (fromFloat, fromInt)
+import Json.Decode as JD
 import Debug exposing (log)
 
-theWheel: WheelDef -> Int -> RotationTarget -> Html msg
+theWheel: WheelDef -> Int -> RotationTarget -> Html Msg
 theWheel defn current target =
   node "wof-container" [ class "pure-u-1" ] [
     peg,
@@ -26,19 +28,36 @@ peg = svg [ SA.class "peg", SA.width "50", SA.height "50", SA.viewBox "-1 -1 2 2
 
 textStyles = style [] [
     text ".light { font: normal 0.1px serif; fill: white; }",
-    text ".dark { font: normal 0.1px serif; fill: black; }"
+    text ".dark { font: normal 0.1px serif; fill: black; }",
+    text ".symbol { font: normal 0.2px serif; fill: black; }"
   ]
 
 innerCircle = circle [ SA.cx "0", SA.cy "0", SA.r "0.4", SA.fill transparency ] []
 
-wheelAndText : WheelDef -> Int -> RotationTarget -> Svg msg
+getInitialAngle angle bias current target =
+  let a = case target of
+          Just n ->
+            if current == n then
+              log "gia at-target" (-angle * (toFloat current) + bias)
+            else
+              log "gia not-at-target" bias
+          Nothing ->
+            -- if target is not set, we're not animating. use current to calculate resting angle
+            log "gia no-target-set" (-angle * (toFloat current) + bias)
+  in 180 * a / pi
+
+wheelAndText : WheelDef -> Int -> RotationTarget -> Svg Msg
 wheelAndText defn current target = 
-  let numSectors = Array.length defn.sectors
+  let c_ = log "wat current" current
+      t_ = log "wat target" target
+      numSectors = Array.length defn.sectors
       angle = (2 * pi) / (toFloat numSectors)
       bias = -pi / 2.0 - angle / 2.0
-      biasDegrees = 360.0 * bias / (2 * pi)
-      initialRotation = (String.concat ["rotate(", (fromFloat biasDegrees), ")"])
+      biasDegrees = 180 * bias / pi
+      initialAngle = log "initialAngle" (getInitialAngle angle bias current target)
+      initialRotation = (String.concat ["rotate(", (fromFloat initialAngle), ")"])
       listSectors = (Array.toList defn.sectors)
+      -- Could likely use a <defn> element with a single sector, then copy it with different matrix
       sectors = (indexedMap (sectorSlice defn.palette angle) listSectors )
       labels = (indexedMap (sectorLabel defn.palette angle) listSectors)
       animations = makeAnimations current target numSectors angle bias
@@ -47,33 +66,39 @@ wheelAndText defn current target =
    (List.concat [sectors, labels, animations])
   
 rotationAnim from to begin dur extra =
+  let l_ = log "rotanim" { from=from, to=to, begin=begin, dur=dur, extra=extra }
+  in
   animateTransform (List.append [ SA.attributeName "transform", SA.type_ "rotate",
                                   SA.begin begin, SA.dur dur, SA.from from, SA.to to ] extra) []
 
--- NOTE: could take a List/Array WheelSector instead
--- Return new global state which contains a list of animations
--- to apply on the wheel. To match the js version:
--- 1. a fast rotation from current angle to 360
--- 2. two medium full rots
--- 3. slow rot to designated position
-makeAnimations : Int -> RotationTarget -> Int -> Float -> Float ->  List (Svg msg)
+-- NOTE: could take a List/Array WheelSector instead of num ??
+makeAnimations : Int -> RotationTarget -> Int -> Float -> Float ->  List (Svg Msg)
 makeAnimations current target num angle bias = 
-    case target of
+    case log "mkanim target" target of
       Just index ->
         if index == current then
           []
         else
-          let currentAngle = log "currentAngle" (angle * (toFloat current) + bias)
-              currentAngleDeg = log "currentAngleDeg" (180 * currentAngle / pi)
-              targetAngle = log "targetAngle" (angle * (toFloat -index) + bias)
-              targetAngleDeg = log "targetAngleDeg" (180 * targetAngle / pi)
-              dur = (3000 * (abs targetAngle) / pi)
+          let currentAngle = angle * (toFloat current) + bias
+              currentAngleDeg = 180 * currentAngle / pi
+              -- the minus is key
+              targetAngle = angle * (toFloat -index) + bias
+              targetAngleDeg = 180 * targetAngle / pi
+              dur = (1500 * (abs targetAngle) / pi)
           in
+              -- NOTE: to not start the animations use begin=indefinite
+              -- and call to javascripts .beginElement() on the first element to start
               [ rotationAnim (fromFloat currentAngleDeg) "-360" "1000ms" "2000ms" [ SA.calcMode "spline", SA.keySplines "0.32 0 0.67 0", SA.keyTimes "0 ; 1" ],
                 rotationAnim "0" "-360" "3000ms" "2000ms" [],
                 -- freeze is the key to make this work, otherwise animation resets
                 -- duration here should not be fixed but depend on circle left
-                rotationAnim "0" (fromFloat targetAngleDeg) "5000ms" ((fromFloat dur) ++ "ms") [ SA.fill "freeze", SA.calcMode "spline", SA.keySplines "0.16 1 0.3 1", SA.keyTimes "0;1" ] 
+                rotationAnim "0" (fromFloat targetAngleDeg)
+                             "5000ms" ((fromFloat dur) ++ "ms") [ 
+                               SA.fill "freeze",
+                               SA.calcMode "spline", SA.keySplines "0.16 1 0.3 1", 
+                               SA.keyTimes "0;1",
+                               SE.on "end" (JD.succeed SpinComplete)
+                               ] 
                 ]
       Nothing -> []
   
@@ -104,11 +129,10 @@ sectorLabel palette angle num content =
       ct = cos textAngle
       st = sin textAngle
   in
-  text_ [ SA.textAnchor "end", SA.dominantBaseline "middle",
-          SA.x "0.95", SA.y "0", 
-          SA.class shade,
-          SA.transform (transformMatrix ct st -st ct 0 0)]
-        [ text (sectorText content) ]
+  sectorText [ SA.textAnchor "end", SA.dominantBaseline "middle",
+               SA.x "0.95", SA.y "0", SA.class shade,
+               SA.transform (transformMatrix ct st -st ct 0 0) ]
+             content
 
 
 transformMatrix : Float -> Float -> Float -> Float -> Float -> Float -> String
@@ -117,15 +141,19 @@ transformMatrix a b c d e f =
                   (fromFloat d), " ", (fromFloat e), " ", (fromFloat f), ")"]
 
 -- TODO: fill with emoji
-sectorText: WheelSector -> String
-sectorText sec = case sec of
-                   Guess val -> fromInt val
-                   Halt -> "STOP"
-                   Bankrupt -> "BANKRUT"
-                   Stonks -> "Stonks"
-                   Sunks -> "Sunks"
-                   FreeVowel -> "AEIOU"
-                   WildCard -> "Q<3"
+sectorText: List (Svg.Attribute msg) -> WheelSector -> Svg msg
+sectorText attrs sec =
+  let symbol = \t -> text_ ((SA.class "symbol") :: attrs) [ text t ]
+      plain = \t -> text_ attrs [ text t ]
+  in
+  case sec of
+    Guess val -> plain (fromInt val)
+    Halt -> symbol "⛔"
+    Bankrupt -> plain "BANKRUT"
+    Stonks -> symbol "📈"
+    Sunks -> symbol "📉"
+    FreeVowel -> plain "AEIOU"
+    WildCard -> symbol "🃏"
 
 getColor: Array ColorDef -> Int -> String
 getColor colors i =
@@ -146,9 +174,3 @@ getFill colors i =
       case item of
         Just (color, fill) -> fill
         _ -> ""
-
--- use state's RNG and set a new target, which will then be picked up by animation routines
-spinWheel : WheelDef -> PlayerState
-spinWheel wheel =
-  Spinning
-

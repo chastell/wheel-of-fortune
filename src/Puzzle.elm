@@ -9,7 +9,7 @@ import Maybe
 vowels = String.toList "AEIOUYĄĘ"
 vowelCost = 200
 
-acceptConsonant : Char -> GameState -> (GameState, Cmd msg)
+acceptConsonant : Char -> GameState -> GameState
 acceptConsonant letter state =
   let used = state.lettersUsed
       -- if we're here, wheel state is definitely ok. But cannot express that via type system yet :(
@@ -17,27 +17,27 @@ acceptConsonant letter state =
       letterScore = (calculateScore letter state.puzzle wheel)
   in
       if member letter used then
-        ({ state | playerState = TurnLost }, Cmd.none)
+        { state | playerState = TurnLost }
       else if member letter vowels then
-        ({ state | playerState = TurnLost }, Cmd.none)
+        { state | playerState = TurnLost }
       else
-        ({ state |
+        { state |
           playerState = ChooseAction,
           lettersUsed = letter :: state.lettersUsed,
           players = updateScore state.players state.currentPlayer letterScore
-        } , Cmd.none)
+        }
 
-acceptVowel : Char -> GameState -> (GameState, Cmd msg)
+acceptVowel : Char -> GameState -> GameState
 acceptVowel letter state =
   let used = state.lettersUsed
   in
       if member letter used then
-        ({ state | playerState = TurnLost }, Cmd.none)
+        { state | playerState = TurnLost }
       else if not (member letter vowels) then
-        ({ state | playerState = TurnLost }, Cmd.none)
+        { state | playerState = TurnLost }
       else
-        ({state | playerState = SpinOrGuess,
+        {state | playerState = SpinOrGuess,
           lettersUsed = letter :: state.lettersUsed,
           players = updateScore state.players state.currentPlayer -vowelCost
-        }, Cmd.none)
+        }
 

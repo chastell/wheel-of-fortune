@@ -4,13 +4,16 @@ import Types exposing (..)
 import Browser
 import Browser.Events
 import Array
+import Set exposing (Set)
 import Html exposing (Html, button, div, text, node)
 import Html.Attributes exposing (class)
 import Template exposing (template, render)
 import WofGrid exposing (letterGrid)
-import Wheel exposing (theWheel, spinWheel)
+import Wheel exposing (theWheel)
+import Players exposing (modIcons, playerList)
 import Puzzle exposing (acceptConsonant, acceptVowel)
 import Json.Decode as Decode
+import Random
 import Debug exposing (log)
 
 
@@ -39,58 +42,122 @@ wheelDefinition = { sectors = Array.fromList [ Guess 100,
                       ("#6c756b", "light"),
                       ("#96c5f7", "dark") ] }
 
+initialPlayers = [
+  initPlayer "Mario",
+  initPlayer "Peach",
+  initPlayer "Luigi",
+  initPlayer "Toad"
+  ]
+
+initPlayer: String -> Player
+initPlayer name = { name = name, score = 0, wildcard = False }
+
 main = Browser.element { init = init, update = update, view = view, subscriptions = subscriptions }
 
 init : () -> ( GameState, Cmd msg )
-init _ = ( { players = [],
-             currentPlayer = -1, playerState = BeforeSpin,
+init _ = ( { players = initialPlayers,
+             currentPlayer = 0, playerState = BeforeSpin,
              current = 0,
+             -- useless? should always get this
              wheelState = Array.get 0 wheelDefinition.sectors,
+             mods = Set.empty,
              lettersUsed = [],
              puzzle = [ "..BĘDZIE.WAS..", "..PIS.RUCHAŁ..", "....W.DUPĘ...."],
              category = "Powiedzenie",
-             target = Just 9
+             target = Nothing,
+             rng = Random.int 0 ((Array.length wheelDefinition.sectors) - 1)
              },
            Cmd.none )
 
-update : Msg -> GameState -> ( GameState, Cmd msg )
+-- list access by index
+nth : Int -> List a -> Maybe a
+nth i list = List.drop i list |> List.head
+
+update : Msg -> GameState -> ( GameState, Cmd Msg )
 update msg state =
-  case msg of
+  case log "update-msg" msg of
     KeyPressed char -> handleLetterKey state char
     SpinCommand -> launchSpin state
+    SpinTo num -> ( { state | target = Just num }, Cmd.none )
+    SpinComplete -> 
+      case log "update-state-spin-target" state.target of
+        Just n ->
+          case (Array.get n wheelDefinition.sectors) of
+            Just sec -> advanceFromSector n state sec
+            Nothing -> ( state, Cmd.none )
+        Nothing -> ( state, Cmd.none ) -- what just happened?
+    NextPlayerCommand ->
+      let numPlayers = List.length state.players
+          nextPlayer = remainderBy numPlayers (state.currentPlayer + 1)
+      in
+          ( { state | currentPlayer = nextPlayer, playerState = BeforeSpin },
+            Cmd.none )
     _ -> ( state, Cmd.none )
 
-
-handleLetterKey : GameState -> Char -> ( GameState, Cmd msg )
-handleLetterKey state char =
-  let playerState = state.playerState
+advanceFromSector : Int -> GameState -> WheelSector -> ( GameState, Cmd Msg )
+advanceFromSector n state sector =
+  -- remember to set state.current to n and target to Nothing
+  let player = nth state.currentPlayer state.players
+      newPlayerState = log "afs nps" (case sector of
+        Guess val -> SpinSuccessConsonant
+        Halt -> TurnLost
+        Bankrupt -> TurnLost
+        FreeVowel -> GuessVowel
+        WildCard -> BeforeSpin
+        Stonks -> BeforeSpin
+        Sunks -> BeforeSpin)
+      newState = log "afs nstat" { state | playerState = newPlayerState, current = n }
   in
-  case playerState of
-    -- accept, pass to letter finder
-    SpinSuccessConsonant -> acceptConsonant char state
-    -- accept, pass to vowel finder
-    ChooseAction -> acceptVowel char state
-    -- otherwise, don't accept
-    _ -> ( state, Cmd.none )
+    case sector of
+        -- TODO: Unless player has wildcard
+        Halt -> update NextPlayerCommand newState
+        Bankrupt -> update NextPlayerCommand newState
+        _ -> ( newState, Cmd.none )
 
+handleLetterKey : GameState -> Char -> ( GameState, Cmd Msg )
+handleLetterKey state char =
+  let playerState = log "h-l-k pstate" state.playerState
+      newGameState = log "h-l-k ngs" (case playerState of
+        -- accept, pass to letter finder
+        SpinSuccessConsonant -> acceptConsonant char state
+        -- accept, pass to vowel finder
+        ChooseAction -> acceptVowel char state
+        -- otherwise, don't accept
+        _ -> state)
+  in
+    case newGameState.playerState of
+      TurnLost -> update NextPlayerCommand newGameState
+      SpinOrGuess -> update NoOp newGameState
+      ChooseAction -> update NoOp newGameState
+      _ -> ( state, Cmd.none )
 
-view : GameState -> Html msg
+view : GameState -> Html Msg
 view state =
-  node "main" [class "pure-u-20-24"] [
-    (categoryDisplay state.category),
-    (letterGrid state.puzzle state.lettersUsed),
-    (theWheel wheelDefinition state.current state.target)
+  div [class "pure-g"] [
+    node "main" [class "pure-u-20-24"] [
+      (categoryDisplay state.category),
+      (letterGrid state.puzzle state.lettersUsed),
+      (theWheel wheelDefinition state.current state.target)
+      ],
+    node "sidebar" [class "pure-u-4-24"] [
+      (modIcons state.mods),
+      (playerList state.players state.currentPlayer state.playerState)
+      ]
   ]
 
-launchSpin : GameState -> ( GameState, Cmd msg)
+launchSpin : GameState -> (GameState, Cmd Msg)
 launchSpin state =
-  let playerState = state.playerState
+  let playerState = log "launchSpin playerstate" state.playerState
   in
-  case playerState of
-    BeforeSpin -> ( { state | playerState = spinWheel wheelDefinition }, Cmd.none )
-    ChooseAction -> ( { state | playerState = spinWheel wheelDefinition }, Cmd.none ) 
-    SpinOrGuess -> ( { state | playerState = spinWheel wheelDefinition }, Cmd.none )
-    _ -> (state, Cmd.none)
+  if List.member playerState [BeforeSpin, ChooseAction, SpinOrGuess] then
+    spinRNG state
+  else
+    (state, Cmd.none)
+
+spinRNG state =
+  ( { state | playerState = Spinning }, 
+    -- how to handle rng generating same sector?
+    Random.generate SpinTo state.rng )
 
 categoryDisplay : String -> Html msg
 categoryDisplay cat = 
