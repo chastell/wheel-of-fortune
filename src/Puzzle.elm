@@ -2,28 +2,31 @@ module Puzzle exposing (..)
 
 import Types exposing (..)
 import Scoring exposing (..)
-import List exposing (member)
-import Debug exposing (log)
+import Set exposing (Set)
+import Padding exposing (padPuzzle)
+import Array
 import Maybe 
 
-vowels = String.toList "AEIOUYĄĘ"
+vowels = Set.fromList (String.toList "AEIOUYĄĘ")
 vowelCost = 200
 
 acceptConsonant : Char -> GameState -> GameState
 acceptConsonant letter state =
   let used = state.lettersUsed
       -- if we're here, wheel state is definitely ok. But cannot express that via type system yet :(
-      wheel = (Maybe.withDefault (Guess 0) state.wheelState)
-      letterScore = (calculateScore letter state.puzzle wheel)
+      wheel = (Array.get state.current state.wheel.sectors)
+      letterScore = (calculateScore letter state.puzzle (Maybe.withDefault (Guess 0) wheel))
   in
-      if member letter used then
+      if Set.member letter used then
         { state | playerState = TurnLost }
-      else if member letter vowels then
+      else if Set.member letter vowels then
+        { state | playerState = TurnLost }
+      else if letterScore == 0 then
         { state | playerState = TurnLost }
       else
         { state |
           playerState = ChooseAction,
-          lettersUsed = letter :: state.lettersUsed,
+          lettersUsed = Set.union (Set.singleton letter) state.lettersUsed,
           players = updateScore state.players state.currentPlayer letterScore
         }
 
@@ -31,13 +34,52 @@ acceptVowel : Char -> GameState -> GameState
 acceptVowel letter state =
   let used = state.lettersUsed
   in
-      if member letter used then
+      if Set.member letter used then
         { state | playerState = TurnLost }
-      else if not (member letter vowels) then
+      else if not (Set.member letter vowels) then
         { state | playerState = TurnLost }
       else
         {state | playerState = SpinOrGuess,
-          lettersUsed = letter :: state.lettersUsed,
+          lettersUsed = Set.union (Set.singleton letter) state.lettersUsed,
           players = updateScore state.players state.currentPlayer -vowelCost
         }
+
+allLetters : List String -> Set Char
+allLetters puzzle =
+  let stringToSet = \t -> String.toList t |> Set.fromList
+      puzzleSet = List.foldl Set.union Set.empty (List.map stringToSet puzzle)
+  in
+      Set.filter (\c -> c /= '.') puzzleSet
+  
+
+reveal : GameState -> GameState
+reveal state =
+  { state | lettersUsed = allLetters state.puzzle, playerState = Dead }
+
+reset : GameState -> String -> String -> GameState
+reset state newPuzzle category = 
+  let width = 14 -- constants
+      height = 4 
+      padded = padPuzzle width height "." -- Will get padded to the whole board
+  in
+      { state |
+        lettersUsed = Set.empty,
+        puzzle = padded,
+        category = category,
+        playerState = BeforeSpin
+        }
+
+setBoard : GameState -> String -> String -> GameState
+setBoard state newPuzzle category =
+  let width = 14 -- constants
+      height = 4 
+      padded = padPuzzle width height newPuzzle
+  in
+      { state |
+        lettersUsed = Set.empty,
+        puzzle = padded,
+        category = category,
+        playerState = BeforeSpin
+        }
+
 

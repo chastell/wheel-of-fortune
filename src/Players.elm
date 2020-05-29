@@ -7,10 +7,18 @@ import List exposing (map, indexedMap)
 import String exposing (String)
 import Types exposing (..)
 
-modIcons : Mods -> Html msg
+modText : Modifier -> String
+modText mod = 
+  case mod of
+    Multiplier tuple (label, mul) -> label
+    UpsideDown n -> "UPDOWN"
+    Shuffled n -> "SHUFFLE"
+    Malfunction n -> "MALFUNCTION"
+
+modIcons : List Modifier -> Html msg
 modIcons mods =
   -- TODO
-  text ""
+  div [] (List.map (\t -> modText t |> text) mods)
 
 playerList : List Player -> Int -> PlayerState -> Html Msg
 playerList players current state =

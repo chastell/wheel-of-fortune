@@ -13,6 +13,15 @@
     <script type="text/javascript">
       const elem = document.querySelector('app')
       const app = Elm.Main.init({node: elem})
+      app.ports.animationLauncher.subscribe(() => {
+        let wheel = document.querySelector('svg > g#wheel-and-text')
+        let anim = wheel.querySelector('animateTransform#initialSpin')
+        anim.beginElement()
+      })
+
+      function loadPuzzle(text, category) {
+        app.ports.setPuzzleText.send([text, category])
+      }
     </script>
   </body>
 </html>

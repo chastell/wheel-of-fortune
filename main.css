@@ -72,15 +72,15 @@ wof-container .peg {
 wof {
   position: relative;
   top: 24px;
-  display: inline-block;
-  height: 600px;
-  left: 50%;
-  transform: translateX(-50%)
+  /* display: inline-block; */
+  /* height: 300px; */
+  /* left: 50%; */
+  /* transform: translateX(-50%) */
 }
 
 wof #circle {
-  height: 80vw;
-  width: 80vw;
+  height: 100%;
+  width: 100%;
 }
 
 category {

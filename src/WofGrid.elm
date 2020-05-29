@@ -3,11 +3,12 @@ module WofGrid exposing (letterGrid)
 import Html exposing (Html, div, node, text)
 import Html.Attributes exposing (class, id)
 import String exposing (fromChar, fromInt)
-import List exposing (map2, range, map, concatMap, member)
+import List exposing (map2, range, map, concatMap)
+import Set exposing (Set)
 
 type Facing = Left | Front | Right | Back
 
-letterGrid : List String -> List Char -> Html msg
+letterGrid : List String -> Set Char -> Html msg
 letterGrid textRows exposed =
   let rows = range 0 3
       indexedRows = map2 Tuple.pair rows textRows
@@ -18,14 +19,14 @@ letterGrid textRows exposed =
 
 type alias HtmlRow a = List (Html a)
 
-gridRow : List Char -> (Int, String) -> HtmlRow msg
+gridRow : Set Char -> (Int, String) -> HtmlRow msg
 gridRow exposed (row, letters) =
   let cols = range 0 13
       indexedCols = map2 Tuple.pair cols (String.toList letters)
   in
   map (cubeBox exposed row) indexedCols
 
-cubeBox : List Char -> Int -> (Int, Char) -> Html msg
+cubeBox : Set Char -> Int -> (Int, Char) -> Html msg
 cubeBox exposed row (col, letter) =
   div
     [ class "box", id (String.join "-" ["box", (fromInt row), (fromInt col)]) ]
@@ -61,9 +62,9 @@ blankCube = cube Nothing Left
 
 letterCube letter = cube letter Front
 
-facingExposed: List Char -> Char -> Facing
+facingExposed: Set Char -> Char -> Facing
 facingExposed exposed letter =
-  if (member letter exposed) then
+  if (Set.member letter exposed) then
     Right
   else
     Front
