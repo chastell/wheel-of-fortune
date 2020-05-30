@@ -5,10 +5,12 @@ import List exposing (indexedMap, foldl, filter, length, map)
 import String exposing (toList)
 import Debug exposing (log)
 
-updateScore: List Player -> Int -> Int -> List Player
-updateScore players index points =
-  let modPoints = \i player -> if i == index then
-                        { player | score = player.score + points }
+updateScore: List Player -> Int -> Int -> List Modifier -> List Player
+updateScore players index points mods =
+  let multiplier = calculateMultiplier mods
+      won = round (toFloat points * multiplier)
+      modPoints = \i player -> if i == index then
+                        { player | score = player.score + won }
                       else
                         player
   in
@@ -35,3 +37,11 @@ calculateScore letter puzzle sector =
   in
       perLetter * occurrences
 
+calculateMultiplier : List Modifier -> Float
+calculateMultiplier mods =
+  let modvalue = \mod -> case mod of
+        Multiplier _ (_, mul) -> mul
+        -- non-multipliers don't contribute
+        _ -> 1.0
+  in
+  List.product (List.map modvalue mods)

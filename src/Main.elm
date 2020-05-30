@@ -10,7 +10,7 @@ import Html.Attributes exposing (class)
 import Template exposing (template, render)
 import WofGrid exposing (letterGrid)
 import Wheel exposing (theWheel)
-import Players exposing (modIcons, playerList)
+import Players exposing (..)
 import Puzzle exposing (acceptConsonant, acceptVowel, reveal, reset, setBoard)
 import Json.Decode as Decode
 import Random
@@ -19,8 +19,9 @@ import Task
 import Debug exposing (log)
 
 
-wheelDefinition = { sectors = Array.fromList [ Guess 100, Guess 250, Guess 500, Guess 150, Guess 300, Guess 1500, Bankrupt, Guess 400, Guess 200, Guess 500, Halt, Guess 350, Guess 450, WildCard ],
+wheelDefinition = { sectors = Array.fromList [ Guess 100, Guess 250, Guess 500, Stonks, Guess 150, Guess 300, Guess 1500, Bankrupt, Guess 400, Guess 200, Sunks, Guess 500, Halt, Guess 350, Guess 450, WildCard ],
                     palette = Array.fromList [ ("#729ea1", "dark"), ("#b5bd89", "dark"), ("#dfbe99", "dark"), ("#ec9192", "dark"), ("#db5375", "dark"), ("#3e4e50", "light"), ("#f2aa7e", "dark"), ("#6c756b", "light"), ("#96c5f7", "dark") ] }
+
 
 initialPlayers = [
   initPlayer "Mario",
@@ -40,7 +41,7 @@ init _ = ( { players = initialPlayers,
              current = 0,
              mods = [],
              lettersUsed = Set.empty,
-             puzzle = [ ".PAN.TADEUSZ..", "....CZYLI.....", "OSTATNI ZAJAZD", "..NA.LITWIE..." ],
+             puzzle = [ ".PAN.TADEUSZ..", "....CZYLI.....", "OSTATNI.ZAJAZD", "..NA.LITWIE..." ],
              category = "Tytuł",
              wheel = wheelDefinition,
              target = Nothing,
@@ -60,6 +61,7 @@ replaceNth index new list =
 
 port animationLauncher : () -> Cmd msg
 port setPuzzleText : (List String -> msg) -> Sub msg
+port setPlayers : (List String -> msg) -> Sub msg
 
 update : Msg -> GameState -> ( GameState, Cmd Msg )
 update msg state =
@@ -81,12 +83,12 @@ update msg state =
             Nothing -> ( state, Cmd.none )
         Nothing -> ( state, Cmd.none ) -- what just happened?
     NextPlayerCommand ->
-      -- TODO: check if mods need to be dropped
       let numPlayers = List.length state.players
           nextPlayer = remainderBy numPlayers (state.currentPlayer + 1)
+          mods = expireMods state.mods nextPlayer
       in
-          ( { state | currentPlayer = nextPlayer, playerState = BeforeSpin },
-            Cmd.none )
+          ( { state | currentPlayer = nextPlayer, mods = mods,
+              playerState = BeforeSpin }, Cmd.none )
     RevealCommand -> ( reveal state, Cmd.none )
     SetPuzzleCommand step text category ->
       case step of
@@ -94,6 +96,8 @@ update msg state =
                Process.sleep 1000 |>
                Task.perform (always (SetPuzzleCommand True text category)) )
         True -> ( setBoard state text category, Cmd.none )
+    SetPlayersCommand newPlayers ->
+      ( { state | players = newPlayers, currentPlayer = 0, playerState = BeforeSpin }, Cmd.none )
     _ -> ( state, Cmd.none )
 
 -- TODO: kick to module?
@@ -105,34 +109,57 @@ advanceFromSector n state sector =
       case (player, sector) of
         (Just(_), Guess val) ->
           ( { landedState | playerState = SpinSuccessConsonant }, Cmd.none )
-        (Just(_), Halt) ->
-          -- TODO: also consume wildcard here?
-          update NextPlayerCommand landedState -- NOTE: TurnLost not set here
+        (Just(p), Halt) ->
+          -- with wildcard: consume it, don't lose turn
+          if p.wildcard then
+            let playerchanged = { p | wildcard = False }
+                updatedPlayers = replaceNth state.currentPlayer playerchanged state.players
+            in
+                ( { landedState | players = updatedPlayers, playerState = BeforeSpin }, Cmd.none )
+          else
+            update NextPlayerCommand landedState
         (Just(p), Bankrupt) ->
-          let bankruptPlayer = if p.wildcard then { p | wildcard = False } else { p | score = 0 }
-              updatedPlayerList = replaceNth state.currentPlayer bankruptPlayer state.players
+          -- with wildcard: consume it, lose turn, but don't bankrupt.
+          let playerchanged = if p.wildcard then
+                                { p | wildcard = False }
+                              else
+                                { p | score = 0 }
+              updated = replaceNth state.currentPlayer playerchanged state.players
           in
-              if p.wildcard then
-                ( { landedState | players = updatedPlayerList, playerState = BeforeSpin }, Cmd.none )
-              else
-                update NextPlayerCommand { landedState | players = updatedPlayerList }
+              update NextPlayerCommand { landedState | players = updated }
         (Just(_), FreeVowel) -> ( { landedState | playerState = GuessVowel }, Cmd.none )
+        -- IDEA: new sector type, with a bomb icon. When landed on, a random sector is removed from the wheel and the player spins again.
         (Just(p), WildCard) ->
-          let updatedPlayer = { p | wildcard = True }
-              updatedPlayerList = replaceNth state.currentPlayer updatedPlayer state.players
+          let playerchanged = { p | wildcard = True }
+              updated = replaceNth state.currentPlayer playerchanged state.players
           in
-              ( { landedState | playerState = BeforeSpin, players = updatedPlayerList }, Cmd.none )
+              ( { landedState | playerState = BeforeSpin, players = updated }, Cmd.none )
         (Just(_), Stonks) ->
-          let multiplier = Multiplier n ("STONKS", 2.0)
-              newMods = multiplier :: state.mods
+          let mul = Multiplier state.currentPlayer ("STONKS", 2.0)
           in
-              ( { landedState | mods = newMods, playerState = BeforeSpin }, Cmd.none )
+              ( { landedState | mods = mul :: state.mods, playerState = BeforeSpin }, Cmd.none )
         (Just(_), Sunks) ->
-          let multiplier = Multiplier n ("SUNKS", 0.5)
-              newMods = multiplier :: state.mods
+          let mul = Multiplier state.currentPlayer ("SUNKS", 0.5)
           in
-              ( { landedState | mods = newMods, playerState = BeforeSpin }, Cmd.none )
-        (_, _) -> ( state, Cmd.none )
+              ( { landedState | mods = mul :: state.mods, playerState = BeforeSpin }, Cmd.none )
+        (Nothing, _) -> ( state, Cmd.none )
+
+expirationTurn : Modifier -> Int
+expirationTurn mod =
+  case mod of
+    Multiplier n _ -> n
+    UpsideDown n -> n
+    Shuffled n -> n
+    Malfunction n -> n
+
+expireMods : List Modifier -> Int -> List Modifier
+expireMods mods playernum =
+  let l_ = log "expireMods mods" mods
+      k_ = log "expireMods playernum" playernum
+      keep = \mod -> (expirationTurn mod) /= playernum
+  in
+      List.filter keep mods
+
 
 handleLetterKey : GameState -> Char -> ( GameState, Cmd Msg )
 handleLetterKey state char =
@@ -166,25 +193,25 @@ view state =
       ]
   ]
 
+categoryDisplay : String -> Html msg
+categoryDisplay cat = 
+  node "category" [class "pure-u-1"] [text cat]
+
 launchSpin : GameState -> (GameState, Cmd Msg)
 launchSpin state =
-  let playerState = log "launchSpin playerstate" state.playerState
+  let playerState = state.playerState
+      canSpin = List.member playerState [
+        BeforeSpin, ChooseAction, SpinOrGuess,
+        -- allow launching for this state, needed when RNG rolls current value again
+        Spinning ]
   in
-  -- The first three are obvious, the last one is to retry spins if the rng
-  -- returns the same value.
-  if List.member playerState [BeforeSpin, ChooseAction, SpinOrGuess, Spinning] then
+  if canSpin then
     spinRNG state
   else
     (state, Cmd.none)
 
 spinRNG state =
-  ( { state | playerState = Spinning }, 
-    -- how to handle rng generating same sector?
-    Random.generate SpinTo state.rng )
-
-categoryDisplay : String -> Html msg
-categoryDisplay cat = 
-  node "category" [class "pure-u-1"] [text cat]
+  ( { state | playerState = Spinning }, Random.generate SpinTo state.rng )
 
 subscriptions : GameState -> Sub Msg
 subscriptions state =
@@ -193,19 +220,25 @@ subscriptions state =
                 text :: category :: [] ->
                   SetPuzzleCommand False text category
                 _ ->
-                  NoOp)
+                  NoOp),
+              setPlayers (\l -> SetPlayersCommand (List.map buildNewPlayer l))
               ]
 
 keyDecoder : Decode.Decoder Msg
 keyDecoder =
-  Decode.map toKey (Decode.field "key" Decode.string)
+  Decode.map3 toKey (Decode.field "key" Decode.string)
+                    (Decode.field "ctrlKey" Decode.bool)
+                    (Decode.field "altKey" Decode.bool)
 
-toKey : String -> Msg
-toKey inp =
-  case String.uncons inp of
-    -- Funky syntax, but useful for pattern matching on single character
-    Just ( ' ', "" ) -> NextPlayerCommand
-    Just ( 'E', "nter" ) -> SpinCommand
-    Just ( '!', "") -> RevealCommand
-    Just ( char, "" ) -> KeyPressed (Char.toUpper char)
-    _ -> NoOp
+toKey : String -> Bool -> Bool -> Msg
+toKey inp ctrl alt =
+  if ctrl || alt then
+    NoOp
+  else
+    case String.uncons inp of
+      -- Funky syntax, but useful for pattern matching on single character
+      Just ( ' ', "" ) -> NextPlayerCommand
+      Just ( 'E', "nter" ) -> SpinCommand
+      Just ( '!', "") -> RevealCommand
+      Just ( char, "" ) -> KeyPressed (Char.toUpper char)
+      _ -> NoOp

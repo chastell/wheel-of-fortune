@@ -38,6 +38,7 @@ type Msg = NoOp
            | SpinComplete
            | RevealCommand
            | SetPuzzleCommand Bool String String
+           | SetPlayersCommand (List Player)
 
 type WheelSector = Guess Int
                    | Halt

@@ -1,4 +1,4 @@
-module Players exposing (playerList, modIcons)
+module Players exposing (playerList, modIcons, buildNewPlayer)
 
 import Html exposing (Html, text, ul, li, span, div)
 import Html.Attributes exposing (class, id)
@@ -7,18 +7,23 @@ import List exposing (map, indexedMap)
 import String exposing (String)
 import Types exposing (..)
 
-modText : Modifier -> String
+modText : Modifier -> Html msg
 modText mod = 
+  let symbol = \t -> span [ class t ] [ ]
+  in
   case mod of
-    Multiplier tuple (label, mul) -> label
-    UpsideDown n -> "UPDOWN"
-    Shuffled n -> "SHUFFLE"
-    Malfunction n -> "MALFUNCTION"
+    Multiplier tuple (label, mul) ->
+      if mul > 1.0 then
+        symbol "chart-up"
+      else
+        symbol "chart-down"
+    UpsideDown n -> symbol "updown"
+    Shuffled n -> symbol "shuffled"
+    Malfunction n -> symbol "malfunction"
 
 modIcons : List Modifier -> Html msg
 modIcons mods =
-  -- TODO
-  div [] (List.map (\t -> modText t |> text) mods)
+  Html.node "mods" [] (List.map modText mods)
 
 playerList : List Player -> Int -> PlayerState -> Html Msg
 playerList players current state =
@@ -62,3 +67,6 @@ spinButton = Html.button [ onClick SpinCommand, class "spin" ] [ text "Spin" ]
 guessButton = Html.button [ class "guess" ] [ text "Guess" ]
 mustGuessButton = Html.button [ class "guess", onClick RevealCommand ] [ text "Guess!" ]
 vowelButton = Html.button [ class "vowel" ] [ text "Buy Vowel" ]
+
+buildNewPlayer : String -> Player
+buildNewPlayer name = { name = name, score = 0, wildcard = False }

@@ -132,8 +132,7 @@ sectorLabel palette angle num content =
       ct = cos textAngle
       st = sin textAngle
   in
-  sectorText [ SA.textAnchor "end", SA.dominantBaseline "middle",
-               SA.x "0.95", SA.y "0", SA.class shade,
+  sectorText [ SA.textAnchor "end", SA.x "0.95", SA.class shade,
                SA.transform (transformMatrix ct st -st ct 0 0) ]
              content
 
@@ -145,8 +144,10 @@ transformMatrix a b c d e f =
 
 sectorText: List (Svg.Attribute msg) -> WheelSector -> Svg msg
 sectorText attrs sec =
-  let symbol = \t -> text_ ((SA.class "symbol") :: attrs) [ text t ]
-      plain = \t -> text_ attrs [ text t ]
+  let symbol = \t -> 
+        text_ (List.append [SA.class "symbol", SA.rotate "90", SA.y "-0.1"] attrs) [ text t ]
+      plain = \t ->
+        text_ (List.append [SA.dominantBaseline "middle", SA.y "0"] attrs) [ text t ]
   in
   case sec of
     Guess val -> plain (fromInt val)

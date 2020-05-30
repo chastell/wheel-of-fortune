@@ -72,10 +72,6 @@ wof-container .peg {
 wof {
   position: relative;
   top: 24px;
-  /* display: inline-block; */
-  /* height: 300px; */
-  /* left: 50%; */
-  /* transform: translateX(-50%) */
 }
 
 wof #circle {
@@ -90,17 +86,43 @@ category {
   background: white;
 }
 
+mods {
+  position: absolute;
+  bottom: 0px;
+  margin-bottom: 12px;
+}
+
+mods span {
+  font-size: 36px;
+}
+
+mods .chart-up::after {
+  content: "📈";
+}
+
+mods .chart-down::after {
+  content: "📉";
+}
+
+mods .updown::after {
+  content: "↕️";
+}
+
+mods .shuffled::after {
+  content: "🔀";
+}
+
+mods .malfunction::after {
+  content:  "🔥";
+}
+
+
 letter-grid {
   display: grid !important;
   height: 320px;
-  /*
-  grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr;
-  grid-template-rows: 1fr 1fr 1fr 1fr;
-   */
   grid-template-columns: auto auto auto auto auto auto auto auto auto auto auto auto auto auto;
   grid-template-rows: auto auto auto auto;
   gap: 5px 5px;
-  /*background: var(--cadet-blue);*/
   background: #f0f;
   padding: 20px 10px;
 }

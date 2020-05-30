@@ -22,6 +22,10 @@
       function loadPuzzle(text, category) {
         app.ports.setPuzzleText.send([text, category])
       }
+
+      function setPlayers(...playerNames) {
+        app.ports.setPlayers.send(playerNames)
+      }
     </script>
   </body>
 </html>

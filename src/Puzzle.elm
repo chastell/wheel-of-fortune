@@ -27,7 +27,7 @@ acceptConsonant letter state =
         { state |
           playerState = ChooseAction,
           lettersUsed = Set.union (Set.singleton letter) state.lettersUsed,
-          players = updateScore state.players state.currentPlayer letterScore
+          players = updateScore state.players state.currentPlayer letterScore state.mods
         }
 
 acceptVowel : Char -> GameState -> GameState
@@ -41,7 +41,9 @@ acceptVowel letter state =
       else
         {state | playerState = SpinOrGuess,
           lettersUsed = Set.union (Set.singleton letter) state.lettersUsed,
-          players = updateScore state.players state.currentPlayer -vowelCost
+          -- mods do not apply to vowels
+          -- TODO: freeVowel
+          players = updateScore state.players state.currentPlayer -vowelCost []
         }
 
 allLetters : List String -> Set Char
