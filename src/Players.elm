@@ -34,10 +34,12 @@ playerList players current state =
 
 playerEntry : Int -> Int -> Player -> Html msg
 playerEntry index current player =
+  let wildcardIcon = text "🃏"
+  in
   li [ class (if index == current then "active" else "") ] [
     span [ class "player-name" ] [
       text player.name,
-      if player.wildcard then text "🃟" else text ""
+      if player.wildcard then wildcardIcon else text ""
       ],
     span [ class "player-score" ] [ text (String.fromInt player.score) ]
     ]
