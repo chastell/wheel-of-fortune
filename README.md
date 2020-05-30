@@ -52,7 +52,7 @@ Category is just a single string, and will be displayed constantly above the let
 Example:
 
 ```
-setPuzzle("HELLO|WORLD", "Computer greeting")
+loadPuzzle("HELLO|WORLD", "Computer greeting")
 ```
 ### `setPlayers("player1", "player2", ...)`
 
