@@ -87,7 +87,7 @@ Tools required:
 1. [OBS](https://obsproject.com)
 2. A virtual cam module for your system, see below. You may get away with just screensharing, but it's less fun.
 3. A modern browser
-4. Your videocall program or WebRTC-enabled browser. Some have annoying quirks, check their section below for tips. If you don't have a preferred one, [Jitsi][https://meet.jit.si] is nice to work with.
+4. Your videocall program or WebRTC-enabled browser. Some have annoying quirks, check their section below for tips. If you don't have a preferred one, [Jitsi](https://meet.jit.si) is nice to work with.
 
 ## Virtual cams
 
