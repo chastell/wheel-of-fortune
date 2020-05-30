@@ -1,4 +1,4 @@
-module Wheel exposing (theWheel)
+module Wheel exposing (theWheel, destroySector)
 
 import Types exposing (..)
 import Html exposing (Html, node)
@@ -10,6 +10,8 @@ import List exposing (length, range, indexedMap, foldl, concatMap, append)
 import Array exposing (Array, get)
 import String exposing (fromFloat, fromInt)
 import Json.Decode as JD
+import Random exposing (Generator)
+import Debug exposing (log)
 
 -- A SVG viewbox is defined by its left and top coordinates, plus width and height.
 -- This allows us to draw the wheel as a circle of radius 1, centered at (0,0)
@@ -157,6 +159,9 @@ sectorText attrs sec =
     Sunks -> symbol "📉"
     FreeVowel -> symbol "🆓"
     WildCard -> symbol "🃏"
+    BoardMalfunction -> symbol "👺" -- a malicious Tengu trickster
+    Bomb -> symbol "💣"
+    FlipLetters -> symbol "🌀"
 
 getColor: Array ColorDef -> Int -> String
 getColor colors i =
@@ -175,3 +180,37 @@ getFill colors i =
       case item of
         Just (color, fill) -> fill
         _ -> ""
+
+isGuess sector = case sector of
+  Guess _ -> True
+  _ -> False
+
+destroySector : WheelDef -> Int -> Int -> Generator Int -> (WheelDef, Generator Int)
+destroySector wheel index current rng =
+  let sectors = wheel.sectors
+      numSectors = Array.length sectors
+  in
+    if numSectors <= 8 then
+      -- Do nothing if number of sectors falls below some useful value
+      let l_ = log "fast exit, not enough sectors"
+      in
+      (wheel, rng)
+    else if List.length (List.filter isGuess (Array.toList wheel.sectors)) < 4 then
+      -- Also exit if not enough guess fields left
+      let l_ = log "fast exit, not enough guess fields" 1
+      in
+          (wheel, rng)
+    else
+      -- Never destroy the sector we're on, which means that the bomb sector always survives.
+      -- TODO: consider a better solution
+      let toRemove = if index == current then index + 1 else index
+          removeIndex = remainderBy numSectors toRemove
+          newLength = numSectors - 1
+          seclist = Array.toList sectors
+          remover = \n list -> List.append (List.take n list) (List.drop (n + 1) list)
+          newsecs = Array.fromList (remover removeIndex seclist)
+          newrng = Random.int 0 (newLength - 1)
+      in
+          ({ wheel | sectors = newsecs }, rng)
+
+

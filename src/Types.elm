@@ -39,6 +39,7 @@ type Msg = NoOp
            | RevealCommand
            | SetPuzzleCommand Bool String String
            | SetPlayersCommand (List Player)
+           | DestroySector Int
 
 type WheelSector = Guess Int
                    | Halt
@@ -47,6 +48,9 @@ type WheelSector = Guess Int
                    | Sunks
                    | FreeVowel
                    | WildCard
+                   | BoardMalfunction
+                   | Bomb
+                   | FlipLetters
 
 type alias ColorDef = (String, String)
 
@@ -57,7 +61,6 @@ type alias RotationTarget = Maybe Int
 -- for these, the Int is player on whose turn it is to end
 type Modifier = Multiplier Int (String, Float) -- icon, multiplier
                 | UpsideDown Int
-                | Shuffled Int
                 | Malfunction Int
 
 -- not a type, but useful to many modules

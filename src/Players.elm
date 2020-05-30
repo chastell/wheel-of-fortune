@@ -1,4 +1,4 @@
-module Players exposing (playerList, modIcons, buildNewPlayer)
+module Players exposing (playerList, buildNewPlayer)
 
 import Html exposing (Html, text, ul, li, span, div)
 import Html.Attributes exposing (class, id)
@@ -6,24 +6,6 @@ import Html.Events exposing (onClick)
 import List exposing (map, indexedMap)
 import String exposing (String)
 import Types exposing (..)
-
-modText : Modifier -> Html msg
-modText mod = 
-  let symbol = \t -> span [ class t ] [ ]
-  in
-  case mod of
-    Multiplier tuple (label, mul) ->
-      if mul > 1.0 then
-        symbol "chart-up"
-      else
-        symbol "chart-down"
-    UpsideDown n -> symbol "updown"
-    Shuffled n -> symbol "shuffled"
-    Malfunction n -> symbol "malfunction"
-
-modIcons : List Modifier -> Html msg
-modIcons mods =
-  Html.node "mods" [] (List.map modText mods)
 
 playerList : List Player -> Int -> PlayerState -> Html Msg
 playerList players current state =

@@ -9,8 +9,9 @@ import Html exposing (Html, button, div, text, node)
 import Html.Attributes exposing (class)
 import Template exposing (template, render)
 import WofGrid exposing (letterGrid)
-import Wheel exposing (theWheel)
+import Wheel exposing (theWheel, destroySector)
 import Players exposing (..)
+import Mods exposing (..)
 import Puzzle exposing (acceptConsonant, acceptVowel, reveal, reset, setBoard)
 import Json.Decode as Decode
 import Random
@@ -19,12 +20,17 @@ import Task
 import Debug exposing (log)
 
 
-wheelDefinition = { sectors = Array.fromList [ FreeVowel, Guess 100, Guess 250, Guess 500, Stonks, Guess 150, Guess 300, Guess 1500, Bankrupt, Guess 400, Guess 200, Sunks, Guess 500, Halt, Guess 350, Guess 450, WildCard ],
+fullSectors = Array.fromList [ FreeVowel, Guess 100, Guess 250, BoardMalfunction, Guess 500, Stonks, Guess 150, Guess 300, Guess 1500, Bankrupt, Guess 400, Guess 200, Sunks, Guess 500, Halt, Guess 350, Guess 450, WildCard, Guess 300, FlipLetters, Guess 400 ]
+
+-- Use for debugging, or assign your own
+shortSectors = Array.fromList [Bomb, Guess 100, Bomb, Guess 200, Bomb, Guess 400, Bomb, Guess 800, Bomb, Guess 1600, Halt]
+
+wheelDefinition = { sectors = fullSectors,
                     palette = Array.fromList [ ("#729ea1", "dark"), ("#b5bd89", "dark"), ("#dfbe99", "dark"), ("#ec9192", "dark"), ("#db5375", "dark"), ("#3e4e50", "light"), ("#f2aa7e", "dark"), ("#6c756b", "light"), ("#96c5f7", "dark") ] }
 
 
 initialPlayers = [
-  initPlayer "Mario",
+  let p = (initPlayer "Mario") in { p | wildcard = True },
   initPlayer "Peach",
   initPlayer "Luigi",
   initPlayer "Toad"
@@ -56,8 +62,7 @@ nth i list = List.drop i list |> List.head
 replaceNth : Int -> a -> List a -> List a
 replaceNth index new list =
   let replacer = (\i elem -> if i == index then new else elem)
-  in
-  List.indexedMap replacer list
+  in List.indexedMap replacer list
 
 port animationLauncher : () -> Cmd msg
 port setPuzzleText : (List String -> msg) -> Sub msg
@@ -75,13 +80,12 @@ update msg state =
       else
         ( { state | target = Just num }, animationLauncher () )
     SpinComplete -> 
-      -- TODO: rewrite to a single tuple-matching case
-      case log "update-state-spin-target" state.target of
+      case state.target of
         Just n ->
-          case (Array.get n wheelDefinition.sectors) of
+          case (Array.get n state.wheel.sectors) of
             Just sec -> advanceFromSector n state sec
-            Nothing -> ( state, Cmd.none )
-        Nothing -> ( state, Cmd.none ) -- what just happened?
+            _ -> ( state, Cmd.none )
+        _ -> ( state, Cmd.none )
     NextPlayerCommand ->
       let numPlayers = List.length state.players
           nextPlayer = remainderBy numPlayers (state.currentPlayer + 1)
@@ -98,7 +102,13 @@ update msg state =
         True -> ( setBoard state text category, Cmd.none )
     SetPlayersCommand newPlayers ->
       ( { state | players = newPlayers, currentPlayer = 0, playerState = BeforeSpin }, Cmd.none )
-    _ -> ( state, Cmd.none )
+    DestroySector index ->
+      let (newWheel, newRng) = destroySector state.wheel index state.current state.rng
+      in
+      ( { state | wheel = (log "newWheel" newWheel), playerState = BeforeSpin,
+                  rng = newRng },
+        Cmd.none )
+    NoOp -> ( state, Cmd.none )
 
 -- TODO: kick to module?
 advanceFromSector : Int -> GameState -> WheelSector -> ( GameState, Cmd Msg )
@@ -142,24 +152,21 @@ advanceFromSector n state sector =
           let mul = Multiplier state.currentPlayer ("SUNKS", 0.5)
           in
               ( { landedState | mods = mul :: state.mods, playerState = BeforeSpin }, Cmd.none )
+        (Just(_), BoardMalfunction) ->
+          let mal = Malfunction state.currentPlayer
+          in
+              ( { landedState | mods = mal :: state.mods, playerState = BeforeSpin }, Cmd.none )
+        (Just(_), Bomb) ->
+          -- The bomb state is not very fun in its current version.
+          -- Maybe it could remove both itself and a random other tile?
+          ( { landedState | playerState = BeforeSpin }, Random.generate DestroySector state.rng )
+        (Just(_), FlipLetters) ->
+          let upd = UpsideDown state.currentPlayer
+          in
+              ( { landedState | mods = upd :: state.mods, playerState = BeforeSpin }, Cmd.none )
+        -- this branch could be (_, ). But keeping it this way makes Elm enforce
+        -- exhaustive matching over board sectors.
         (Nothing, _) -> ( state, Cmd.none )
-
-expirationTurn : Modifier -> Int
-expirationTurn mod =
-  case mod of
-    Multiplier n _ -> n
-    UpsideDown n -> n
-    Shuffled n -> n
-    Malfunction n -> n
-
-expireMods : List Modifier -> Int -> List Modifier
-expireMods mods playernum =
-  let l_ = log "expireMods mods" mods
-      k_ = log "expireMods playernum" playernum
-      keep = \mod -> (expirationTurn mod) /= playernum
-  in
-      List.filter keep mods
-
 
 handleLetterKey : GameState -> Char -> ( GameState, Cmd Msg )
 handleLetterKey state char =
@@ -175,17 +182,20 @@ handleLetterKey state char =
   in
     case newGameState.playerState of
       TurnLost -> update NextPlayerCommand newGameState
-      SpinOrGuess -> update NoOp newGameState
-      ChooseAction -> update NoOp newGameState
+      SpinOrGuess -> ( newGameState, Cmd.none )
+      ChooseAction -> ( newGameState, Cmd.none )
       _ -> ( state, Cmd.none )
 
 view : GameState -> Html Msg
 view state =
+  let malfunction = List.any isMalfunction state.mods
+      flipped = calculateFlipState state.mods
+  in
   div [class "pure-g"] [
     node "main" [class "pure-u-20-24"] [
       (categoryDisplay state.category),
-      (letterGrid state.puzzle state.lettersUsed),
-      (theWheel wheelDefinition state.current state.target)
+      (letterGrid state.puzzle state.lettersUsed malfunction flipped),
+      (theWheel state.wheel state.current state.target)
       ],
     node "sidebar" [class "pure-u-4-24"] [
       (modIcons state.mods),
