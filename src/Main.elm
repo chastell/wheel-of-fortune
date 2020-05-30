@@ -19,7 +19,7 @@ import Task
 import Debug exposing (log)
 
 
-wheelDefinition = { sectors = Array.fromList [ Guess 100, Guess 250, Guess 500, Stonks, Guess 150, Guess 300, Guess 1500, Bankrupt, Guess 400, Guess 200, Sunks, Guess 500, Halt, Guess 350, Guess 450, WildCard ],
+wheelDefinition = { sectors = Array.fromList [ FreeVowel, Guess 100, Guess 250, Guess 500, Stonks, Guess 150, Guess 300, Guess 1500, Bankrupt, Guess 400, Guess 200, Sunks, Guess 500, Halt, Guess 350, Guess 450, WildCard ],
                     palette = Array.fromList [ ("#729ea1", "dark"), ("#b5bd89", "dark"), ("#dfbe99", "dark"), ("#ec9192", "dark"), ("#db5375", "dark"), ("#3e4e50", "light"), ("#f2aa7e", "dark"), ("#6c756b", "light"), ("#96c5f7", "dark") ] }
 
 

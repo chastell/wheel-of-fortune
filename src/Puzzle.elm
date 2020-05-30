@@ -14,8 +14,8 @@ acceptConsonant : Char -> GameState -> GameState
 acceptConsonant letter state =
   let used = state.lettersUsed
       -- if we're here, wheel state is definitely ok. But cannot express that via type system yet :(
-      wheel = (Array.get state.current state.wheel.sectors)
-      letterScore = (calculateScore letter state.puzzle (Maybe.withDefault (Guess 0) wheel))
+      sector = (Array.get state.current state.wheel.sectors)
+      letterScore = (calculateScore letter state.puzzle (Maybe.withDefault (Guess 0) sector))
   in
       if Set.member letter used then
         { state | playerState = TurnLost }
@@ -33,6 +33,10 @@ acceptConsonant letter state =
 acceptVowel : Char -> GameState -> GameState
 acceptVowel letter state =
   let used = state.lettersUsed
+      sector = (Array.get state.current state.wheel.sectors)
+      cost = case sector of
+        Just(FreeVowel) -> 0
+        _ -> vowelCost
   in
       if Set.member letter used then
         { state | playerState = TurnLost }
@@ -41,9 +45,8 @@ acceptVowel letter state =
       else
         {state | playerState = SpinOrGuess,
           lettersUsed = Set.union (Set.singleton letter) state.lettersUsed,
-          -- mods do not apply to vowels
-          -- TODO: freeVowel
-          players = updateScore state.players state.currentPlayer -vowelCost []
+          -- mods do not apply to vowels, pass empty mod list
+          players = updateScore state.players state.currentPlayer -cost []
         }
 
 allLetters : List String -> Set Char

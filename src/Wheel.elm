@@ -155,7 +155,7 @@ sectorText attrs sec =
     Bankrupt -> symbol "🦹"
     Stonks -> symbol "📈"
     Sunks -> symbol "📉"
-    FreeVowel -> plain "AEIOU"
+    FreeVowel -> symbol "🆓"
     WildCard -> symbol "🃏"
 
 getColor: Array ColorDef -> Int -> String
