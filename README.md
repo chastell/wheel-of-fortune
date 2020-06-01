@@ -12,12 +12,12 @@ I wanted to try creating a real (albeit small) project in some less known langua
 
 ## Features
 
-* Construct your own wheel using reward fields and many actions
+* Construct your own wheel using reward fields and many actions.
 * Buffs/debuffs which modify the game!
-* Likely usable only for alphabet-based languages, not ones that use ideograms or logograms (like Chinese), syllabaries (like Japanese), abjads (Arabic, Hebrew) or abugidas (like Tamil or Thai).
+* Likely usable only for alphabet-based languages, not ones that use ideograms or logograms (like Chinese), syllabaries (like Japanese), abjads (Arabic, Hebrew) or abugidas (like Tamil or Thai). However, many countries using these alphabets _did have_ their editions of the TV show, so it may work out for you.
 * Will accept any letter your keyboard produces. Needs tweaking to know what the vowels for your language are, comes with defaults for Polish.
-* Annoying magenta background
-* Devtools-based management
+* Annoying magenta background.
+* Devtools-based management.
 
 
 # Building
@@ -25,6 +25,15 @@ I wanted to try creating a real (albeit small) project in some less known langua
 1. [Install elm](https://guide.elm-lang.org/install/elm.html)
 2. Run `make` in the project directory
 3. Launch a webserver in the project directory and navigate to `index.html`
+
+
+# Developing
+
+1. [Install elm](https://guide.elm-lang.org/install/elm.html) and [entr](http://eradman.com/entrproject/)
+2. Run `elm reactor` in the project directory, and `find src/ | entr -s make` alongside.
+3. Navigate to `localhost:8000` (or whatever port the reactor runs on) and open `src/Main.elm`. This is automatically compiled by the reactor, but lacks styles and JS interop. This is where you'll read compiler errors in detail.
+4. Navigate to `localhost:8000/index.html` for the full page. The `entr + make` command automatically builds the js bundle on save, but will fail on errors - this is when you read the previous tab.
+
 
 # Manual
 
@@ -53,6 +62,8 @@ Example:
 
 ```
 loadPuzzle("HELLO|WORLD", "Computer greeting")
+// equivalent to
+loadPuzzle("..............|.....HELLO....|.....WORLD....|..............", "Computer greeting")
 ```
 ### `setPlayers("player1", "player2", ...)`
 
@@ -95,6 +106,7 @@ A virtual cam module is any piece of software that exposes itself to other apps 
 
 On Windows, use [OBS Virtualcam](https://obsproject.com/forum/resources/obs-virtualcam.949/).
 On Linux, first install [v4l2-loopback](https://github.com/umlaeute/v4l2loopback) for your distribution, load the module, then use [v4l2sink](https://github.com/CatxFish/obs-v4l2sink) in OBS. You may want to enable the exclusive-caps mode for v4l2loopback if Chrome/Chromium doesn't cooperate.
+On macOS, use [obs-mac-virtualcam](https://github.com/johnboiles/obs-mac-virtualcam).
 
 
 
@@ -135,4 +147,6 @@ Does not allow switching cameras mid-call. You'll have to restart the applicatio
 
 Very annoying, avoid. Always tries to grab the first camera and shows an error if it's busy (when used by OBS), refusing to start or join the call. However, allows switching cameras mid-call, therefore the solution is to let it grab your actual webcam, then disable video, launch OBS + virtualcam and select the new camera again. Drops quality without warning or options to change behavior, to levels unusable for the game.
 
+## macOS apps
 
+Some signed applications may reject cameras from modules not signed by Apple, making the Virtualcam useless. Check the [compatibility list](https://github.com/johnboiles/obs-mac-virtualcam/wiki/Compatibility) from obs-mac-virtualcam.
