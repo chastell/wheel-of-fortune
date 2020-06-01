@@ -1,6 +1,7 @@
 module Scoring exposing (..)
 
 import Types exposing (..)
+import Mods exposing (calculateMultiplier)
 import List exposing (indexedMap, foldl, filter, length, map)
 import String exposing (toList)
 import Debug exposing (log)
@@ -36,12 +37,3 @@ calculateScore letter puzzle sector =
       occurrences = countInPuzzle letter puzzle
   in
       perLetter * occurrences
-
-calculateMultiplier : List Modifier -> Float
-calculateMultiplier mods =
-  let modvalue = \mod -> case mod of
-        Multiplier _ (_, mul) -> mul
-        -- non-multipliers don't contribute
-        _ -> 1.0
-  in
-  List.product (List.map modvalue mods)

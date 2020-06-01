@@ -1,4 +1,4 @@
-module Mods exposing (expireMods, isMalfunction, calculateFlipState, modIcons)
+module Mods exposing (expireMods, isMalfunction, calculateFlipState, modIcons, calculateMultiplier)
 
 import Html exposing (Html, span)
 import Html.Attributes exposing (class, id)
@@ -47,3 +47,11 @@ modIcons : List Modifier -> Html msg
 modIcons mods =
   Html.node "mods" [] (List.map modText mods)
 
+calculateMultiplier : List Modifier -> Float
+calculateMultiplier mods =
+  let modvalue = \mod -> case mod of
+        Multiplier _ (_, mul) -> mul
+        -- non-multipliers don't contribute
+        _ -> 1.0
+  in
+  List.product (List.map modvalue mods)
