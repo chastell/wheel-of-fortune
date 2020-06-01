@@ -14,7 +14,7 @@ I wanted to try creating a real (albeit small) project in some less known langua
 
 * Construct your own wheel using reward fields and many actions.
 * Buffs/debuffs which modify the game!
-* Likely usable only for alphabet-based languages, not ones that use ideograms or logograms (like Chinese), syllabaries (like Japanese), abjads (Arabic, Hebrew) or abugidas (like Tamil or Thai). However, many countries using these alphabets _did have_ their editions of the TV show, so it may work out for you.
+* Likely usable only for alphabet-based languages, not ones that use ideograms or logograms (like Chinese), syllabaries (like Japanese), abjads (Arabic, Hebrew) or abugidas (like Tamil or Thai). However, many countries using these writing systems _did have_ their editions of the TV show, so it may work out for you.
 * Will accept any letter your keyboard produces. Needs tweaking to know what the vowels for your language are, comes with defaults for Polish.
 * Annoying magenta background.
 * Devtools-based management.
