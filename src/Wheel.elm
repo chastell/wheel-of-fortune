@@ -9,6 +9,7 @@ import Svg.Events as SE
 import List exposing (length, range, indexedMap, foldl, concatMap, append)
 import Array exposing (Array, get)
 import String exposing (fromFloat, fromInt)
+import Util exposing (weightedIndex)
 import Json.Decode as JD
 import Random exposing (Generator)
 import Debug exposing (log)
@@ -19,12 +20,16 @@ unitSquare = "-1 -1 2 2"
 
 theWheel: WheelDef -> Int -> RotationTarget -> Html Msg
 theWheel defn current target =
+  let numSectors = Array.length defn.sectors
+      angle = (2 * pi) / (toFloat numSectors)
+  in
   node "wof-container" [ class "pure-u-1" ] [
     peg,
     node "wof" [] [
       svg [ SA.id "circle", SA.class "pure-u-1",
             SA.width "200", SA.height "200", SA.viewBox unitSquare ]
-          [ textStyles,
+          [ Svg.defs [] [ oneSector angle ],
+            textStyles,
             (wheelAndText defn current target), 
             innerCircle ]
       ]
@@ -55,14 +60,13 @@ wheelAndText defn current target =
       bias = -pi / 2.0 - angle / 2.0
       initialAngle = getInitialAngle angle bias current
       initialRotation = (String.concat ["rotate(", (fromFloat initialAngle), ")"])
-      listSectors = (Array.toList defn.sectors)
-      -- Could likely use a <defn> element with a single sector, then copy it with different matrix
+      listSectors = Array.toList defn.sectors
       sectors = (indexedMap (sectorSlice defn.palette angle) listSectors )
       labels = (indexedMap (sectorLabel defn.palette angle) listSectors)
       animations = makeAnimations current target angle bias
   in
   g [ SA.id "wheel-and-text", SA.transform initialRotation ]
-   (List.concat [sectors, labels, animations])
+   (List.concat [ sectors, labels, animations])
   
 rotationAnim: Float -> Float -> String -> String -> List (Attribute msg) -> Svg msg
 rotationAnim from to begin dur extra =
@@ -98,19 +102,20 @@ makeAnimations current target angle bias =
           ]
   
 
+oneSector : Float -> Svg msg
+oneSector angle = 
+  path [ SA.id "oneSector", SA.d (sectorPath 1 0 (cos angle) (sin angle)) ] []
+
 sectorSlice: (Array ColorDef) -> Float -> Int -> WheelSector -> Svg msg
 sectorSlice palette angle num content =
-  let startAngle = angle * (toFloat num)
-      -- Normally these would be multiplied by radius. But our radius is always 1: see comments on unitSquare.
-      x0 = cos startAngle
-      y0 = sin startAngle
-      endAngle = angle * (toFloat num + 1)
-      x1 = cos endAngle
-      y1 = sin endAngle
+  let a = angle * (toFloat num)
+      ct = cos a
+      st = sin a
       color = getColor palette num
   in
-      path [ SA.d (sectorPath x0 y0 x1 y1), SA.fill (color) ] []
-
+    Svg.use [ SA.xlinkHref "#oneSector",
+              SA.transform (transformMatrix ct st -st ct 0 0),
+              SA.fill color ] []
 
 sectorPath: Float -> Float -> Float -> Float -> String
 sectorPath x0 y0 x1 y1 = 
@@ -185,8 +190,8 @@ isGuess sector = case sector of
   Guess _ -> True
   _ -> False
 
-destroySector : WheelDef -> Int -> Int -> Generator Int -> (WheelDef, Generator Int)
-destroySector wheel index current rng =
+destroySector : WheelDef -> Float -> Int -> Generator Float -> (WheelDef, Generator Float)
+destroySector wheel weighted current rng =
   let sectors = wheel.sectors
       numSectors = Array.length sectors
   in
@@ -203,7 +208,8 @@ destroySector wheel index current rng =
     else
       -- Never destroy the sector we're on, which means that the bomb sector always survives.
       -- TODO: consider a better solution
-      let toRemove = if index == current then index + 1 else index
+      let index = weightedIndex weighted wheel.weights
+          toRemove = if index == current then index + 1 else index
           removeIndex = remainderBy numSectors toRemove
           newLength = numSectors - 1
           seclist = Array.toList sectors

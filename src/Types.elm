@@ -27,19 +27,19 @@ type alias GameState = { players : List Player,
                          current: Int,
                          wheel: WheelDef,
                          target: RotationTarget,
-                         rng: Generator Int
+                         rng: Generator Float
                        }
 
 type Msg = NoOp 
            | KeyPressed Char
            | NextPlayerCommand
            | SpinCommand
-           | SpinTo Int
+           | SpinTo Float
            | SpinComplete
            | RevealCommand
            | SetPuzzleCommand Bool String String
            | SetPlayersCommand (List Player)
-           | DestroySector Int
+           | DestroySector Float
 
 type WheelSector = Guess Int
                    | Halt
@@ -54,7 +54,7 @@ type WheelSector = Guess Int
 
 type alias ColorDef = (String, String)
 
-type alias WheelDef = { sectors: Array WheelSector, palette: Array ColorDef }
+type alias WheelDef = { sectors: Array WheelSector, weights: List Float, palette: Array ColorDef }
 
 type alias RotationTarget = Maybe Int
 

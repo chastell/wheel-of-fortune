@@ -13,6 +13,7 @@ import Wheel exposing (theWheel, destroySector)
 import Players exposing (..)
 import Mods exposing (..)
 import Puzzle exposing (acceptConsonant, acceptVowel, reveal, reset, setBoard)
+import Util exposing (weightedIndex, normalizeWeights)
 import Json.Decode as Decode
 import Random
 import Process
@@ -20,12 +21,26 @@ import Task
 import Debug exposing (log)
 
 
-fullSectors = Array.fromList [ FreeVowel, Guess 100, Guess 250, BoardMalfunction, Guess 500, Stonks, Guess 150, Guess 300, Guess 1500, Bankrupt, Guess 400, Guess 200, Sunks, Guess 500, Halt, Guess 350, Guess 450, WildCard, Guess 300, FlipLetters, Guess 400 ]
+fullSectors = Array.fromList [ FreeVowel, Guess 100, Guess 250, BoardMalfunction, Guess 500,
+                               Stonks, Guess 150, Guess 300, Guess 1500, Bankrupt, 
+                               Guess 400, Guess 200, Sunks, Guess 500, Halt, 
+                               Guess 350, Guess 450, WildCard, Guess 300, FlipLetters, 
+                               Guess 400 ]
+
+fullWeights = normalizeWeights [ 0.8, 1, 1, 0.1, 1, 
+                                 0.3, 1, 1, 0.5, 0.2, 
+                                 1, 1, 0.3, 1, 0.4,
+                                 1, 1, 0.5, 1, 0.1,
+                                 1 ]
+
 
 -- Use for debugging, or assign your own
-shortSectors = Array.fromList [Bomb, Guess 100, Bomb, Guess 200, Bomb, Guess 400, Bomb, Guess 800, Bomb, Guess 1600, Halt]
+shortSectors = Array.fromList [Bomb, Guess 100, Guess 200,  Guess 400, Halt]
+shortWeights = [ 0.5, 2, 1, 1, 0.5 ]
 
 wheelDefinition = { sectors = fullSectors,
+                    -- use List.repeat n 1.0 for an equally weighted wheel
+                    weights = fullWeights,
                     palette = Array.fromList [ ("#729ea1", "dark"), ("#b5bd89", "dark"), ("#dfbe99", "dark"), ("#ec9192", "dark"), ("#db5375", "dark"), ("#3e4e50", "light"), ("#f2aa7e", "dark"), ("#6c756b", "light"), ("#96c5f7", "dark") ] }
 
 
@@ -42,18 +57,19 @@ initPlayer name = { name = name, score = 0, wildcard = False }
 main = Browser.element { init = init, update = update, view = view, subscriptions = subscriptions }
 
 init : () -> ( GameState, Cmd msg )
-init _ = ( { players = initialPlayers,
-             currentPlayer = 0, playerState = BeforeSpin,
-             current = 0,
-             mods = [],
-             lettersUsed = Set.empty,
-             puzzle = [ ".PAN.TADEUSZ..", "....CZYLI.....", "OSTATNI.ZAJAZD", "..NA.LITWIE..." ],
-             category = "Tytuł",
-             wheel = wheelDefinition,
-             target = Nothing,
-             rng = Random.int 0 ((Array.length wheelDefinition.sectors) - 1)
-             },
-           Cmd.none )
+init _ = let totalWeight = List.sum wheelDefinition.weights
+             state = { players = initialPlayers,
+                 currentPlayer = 0, playerState = BeforeSpin,
+                 current = 0,
+                 mods = [],
+                 lettersUsed = Set.empty,
+                 puzzle = [ ".PAN.TADEUSZ..", "....CZYLI.....", "OSTATNI.ZAJAZD", "..NA.LITWIE..." ],
+                 category = "Tytuł",
+                 wheel = wheelDefinition,
+                 target = Nothing,
+                 rng = Random.float 0 totalWeight
+               }
+         in ( state, Cmd.none )
 
 -- list access by index
 nth : Int -> List a -> Maybe a
@@ -73,7 +89,9 @@ update msg state =
   case log "update-msg" msg of
     KeyPressed char -> handleLetterKey state char
     SpinCommand -> launchSpin state
-    SpinTo num ->
+    SpinTo weighted ->
+      let num = weightedIndex weighted state.wheel.weights 
+      in
       if num == state.current then
         -- Try to never spin same value twice
         launchSpin state
@@ -102,8 +120,8 @@ update msg state =
         True -> ( setBoard state text category, Cmd.none )
     SetPlayersCommand newPlayers ->
       ( { state | players = newPlayers, currentPlayer = 0, playerState = BeforeSpin }, Cmd.none )
-    DestroySector index ->
-      let (newWheel, newRng) = destroySector state.wheel index state.current state.rng
+    DestroySector weightedIndex ->
+      let (newWheel, newRng) = destroySector state.wheel weightedIndex state.current state.rng
       in
       ( { state | wheel = (log "newWheel" newWheel), playerState = BeforeSpin,
                   rng = newRng },
@@ -220,6 +238,7 @@ launchSpin state =
   else
     (state, Cmd.none)
 
+spinRNG: GameState -> (GameState, Cmd Msg)
 spinRNG state =
   ( { state | playerState = Spinning }, Random.generate SpinTo state.rng )
 
