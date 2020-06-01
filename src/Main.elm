@@ -208,12 +208,13 @@ view : GameState -> Html Msg
 view state =
   let malfunction = List.any isMalfunction state.mods
       flipped = calculateFlipState state.mods
+      mul = calculateMultiplier state.mods
   in
   div [class "pure-g"] [
     node "main" [class "pure-u-20-24"] [
       (categoryDisplay state.category),
       (letterGrid state.puzzle state.lettersUsed malfunction flipped),
-      (theWheel state.wheel state.current state.target)
+      (theWheel state.wheel state.current state.target mul)
       ],
     node "sidebar" [class "pure-u-4-24"] [
       (modIcons state.mods),

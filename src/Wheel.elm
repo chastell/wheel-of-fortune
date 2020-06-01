@@ -1,6 +1,7 @@
 module Wheel exposing (theWheel, destroySector)
 
 import Types exposing (..)
+import Mods exposing (calculateMultiplier)
 import Html exposing (Html, node)
 import Html.Attributes exposing (class, id)
 import Svg exposing (Svg, Attribute, svg, path, style, text, text_, g, circle, animateTransform)
@@ -18,8 +19,8 @@ import Debug exposing (log)
 -- This allows us to draw the wheel as a circle of radius 1, centered at (0,0)
 unitSquare = "-1 -1 2 2"
 
-theWheel: WheelDef -> Int -> RotationTarget -> Html Msg
-theWheel defn current target =
+theWheel: WheelDef -> Int -> RotationTarget -> Float -> Html Msg
+theWheel defn current target multiplier =
   let numSectors = Array.length defn.sectors
       angle = (2 * pi) / (toFloat numSectors)
   in
@@ -30,7 +31,7 @@ theWheel defn current target =
             SA.width "200", SA.height "200", SA.viewBox unitSquare ]
           [ Svg.defs [] [ oneSector angle ],
             textStyles,
-            (wheelAndText defn current target), 
+            (wheelAndText defn current target multiplier), 
             innerCircle ]
       ]
   ]
@@ -53,8 +54,8 @@ getInitialAngle angle bias current =
   let sectorAngle = -angle * (toFloat current) + bias
   in degrees sectorAngle
 
-wheelAndText : WheelDef -> Int -> RotationTarget -> Svg Msg
-wheelAndText defn current target = 
+wheelAndText : WheelDef -> Int -> RotationTarget -> Float -> Svg Msg
+wheelAndText defn current target mul = 
   let numSectors = Array.length defn.sectors
       angle = (2 * pi) / (toFloat numSectors)
       bias = -pi / 2.0 - angle / 2.0
@@ -62,7 +63,7 @@ wheelAndText defn current target =
       initialRotation = (String.concat ["rotate(", (fromFloat initialAngle), ")"])
       listSectors = Array.toList defn.sectors
       sectors = (indexedMap (sectorSlice defn.palette angle) listSectors )
-      labels = (indexedMap (sectorLabel defn.palette angle) listSectors)
+      labels = (indexedMap (sectorLabel defn.palette angle mul) listSectors)
       animations = makeAnimations current target angle bias
   in
   g [ SA.id "wheel-and-text", SA.transform initialRotation ]
@@ -132,16 +133,19 @@ sectorPath x0 y0 x1 y1 =
       -- For filled paths, the last segment (from 0 0 to x0 y0) is implicit, and we can omit it.
       ]
 
-sectorLabel: Array ColorDef -> Float -> Int -> WheelSector -> Svg msg
-sectorLabel palette angle num content =
+sectorLabel: Array ColorDef -> Float -> Float -> Int -> WheelSector -> Svg msg
+sectorLabel palette angle mul num content =
   let shade = getFill palette num
       textAngle = angle * (toFloat num) + angle / 2.0
       ct = cos textAngle
       st = sin textAngle
+      mulContent = case content of
+        Guess n -> Guess (round ((toFloat n) * mul))
+        other -> other
   in
   sectorText [ SA.textAnchor "end", SA.x "0.95", SA.class shade,
                SA.transform (transformMatrix ct st -st ct 0 0) ]
-             content
+             mulContent
 
 
 transformMatrix : Float -> Float -> Float -> Float -> Float -> Float -> String
