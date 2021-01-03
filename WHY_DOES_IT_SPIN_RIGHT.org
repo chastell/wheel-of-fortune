@@ -9,7 +9,7 @@
 #+latex_class: beamer
 #+latex_header: \usepackage{amsmath}
 #+latex_header: \usepackage{tikz}
-#+latex_header: \mode<beamer>{\usecolortheme[snowy]{owl}}
+#+latex_header: \mode<beamer>{\usetheme{metropolis}}
 # (eval setq org-preview-latex-default-process 'dvisvgm)
 
 * TL;DR
