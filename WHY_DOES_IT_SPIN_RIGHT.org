@@ -1,0 +1,275 @@
+#+TITLE: Why does it spin right?
+#+AUTHOR: Krzysztof Zych
+#+EMAIL: krzysztof.zych@rebased.pl
+#+DATE: 2020-01-03
+#+LANGUAGE: en
+#+OPTIONS: toc:f tex:t latex:t ::t date:f H:2
+#+startup: beamer
+#+latex_compiler: xelatex
+#+latex_class: beamer
+#+latex_header: \usepackage{amsmath}
+#+latex_header: \usepackage{tikz}
+#+latex_header: \mode<beamer>{\usecolortheme[snowy]{owl}}
+# (eval setq org-preview-latex-default-process 'dvisvgm)
+
+* TL;DR
+** Executive summary, or I've only got 2 minutes for this
+
+Because some spin positions are beyond -360°. When the spin animation starts, it rolls the wheel 
+to the -360 position. Next, it does a single, fast full spin, followed by settling on the target angle.
+
+When that starting position is e.g. -447°, the initial spin is to the right, not left.
+
+** Thank you for coming to my TED Talk
+   
+The long story follows.
+
+* SVG
+  
+** This is how the wheel is drawn
+   
+#+NAME: Wheel SVG
+#+BEGIN_SRC xml
+  <svg viewBox="-1 -1 2 2">
+    <defs>
+      <path id="oneSector" d="M 1 0 A 1 1 0 0 1 0.955 0.295 L 0 0"/>
+    </defs>
+    <g id="wheel-and-text" transform="rotate(-98.57)">
+      <use xlink:href="#oneSector"
+           transform="matrix(1 0 0 1 0 0)" fill="#729ea1"/>
+      <use xlink:href="#oneSector"
+           transform="matrix(0.955 0.295 -0.295 0.955 0 0)"
+           fill="#b5bd89"/>
+      ...
+    </g>
+    <circle cx="0" cy="0" r="0.4" fill="#f0f"/>
+    [animations...]
+  </svg>
+#+END_SRC
+
+
+* The world is math, or Linear Algebra 101
+
+** Our viewBox is a unit square
+
+~<svg viewBox="-1 -1 2 2">~
+
+\begin{tikzpicture}[scale=2]
+\draw [->] (-1, 0) -- (1, 0);
+\draw [->] (0, -1) -- (0, 1);
+\draw (-1, 0) node [anchor=north west] {-1};
+\draw (0, -1) node [anchor=south east] {-1};
+\draw (1, 0) node [anchor=north east] {1};
+\draw (0, 1) node [anchor=north east] {1};
+\filldraw (-1, -1) circle[radius=0.5pt];
+\draw (-1, -1) node[anchor=south west] {(-1, -1)};
+\filldraw (1, 1) circle[radius=0.5pt];
+\draw (1, 1) node[anchor=north east] {(1, 1)};
+\draw [dashed] (-1, -1) -- (-1, 1) -- (1, 1) -- (1, -1) -- cycle;
+\end{tikzpicture}
+
+Well, almost. In the world of 2D computer graphics, the X axis actually goes down, not up.
+So our coordinate system is actually flipped: the point at $(-1, -1)$ is in the top-left corner. 
+
+** A single sector
+
+\begin{tikzpicture}[scale=2]
+\draw [->] (-1, 0) -- (1, 0);
+\draw [->] (0, -1) -- (0, 1);
+\draw (-1, 0) node [anchor=north west] {$-1$};
+\draw (0, -1) node [anchor=south east] {$-1$};
+\draw (1, 0) node [anchor=north east] {$1$};
+\draw (0, 1) node [anchor=north east] {$1$};
+
+\draw (0, 0) -- (1, 0) arc[start angle=0, end angle=30, radius=1] -- cycle;
+\draw (0.5, 0.0) node [anchor=south] {$\alpha = \frac{2 \pi}{N}$};
+\draw (0, 0) -- node [anchor=north] {$\cos(\alpha)$} (30:1 |- 0,0) [thick];
+\draw (30:1) -- node [anchor=west] {$\sin(\alpha)$} (30:1 |- 0,0) [thick];
+\end{tikzpicture}
+
+** A sector path
+
+#+BEGIN_SRC xml
+<path id="oneSector"
+      d="M 1 0 A 1 1 0 0 1 0.955 0.295 L 0 0"/>
+#+END_SRC
+
+\begin{tikzpicture}[scale=2]
+
+\filldraw (1, 0) circle[radius=0.5pt];
+\draw (1, 0) node[anchor=north] {M 1 0};
+
+\draw (1, 0) arc[start angle=0, end angle=30, radius=1] node [anchor=west] {$A \, 1 \, 1 \, 0 \, 0 \, 1 \cos(\alpha) \sin(\alpha)$};
+\filldraw (30:1) circle[radius=0.5pt];
+
+\draw (30:1) -- (0, 0);
+\filldraw (0, 0) circle[radius=0.5pt] node [anchor=north] {L 0 0};
+\draw (1, 0) -- (0, 0) [dashed];
+\end{tikzpicture}
+
+Which is then auto-closed by SVG. We could explicitely close it by adding a ~Z~ command at the end.
+
+  
+** ~transform="matrix(A B C D E F)"~
+
+\begin{bmatrix}
+x_1 \\ y_1 \\ 1
+\end{bmatrix} = \begin{bmatrix}
+A & C & E \\
+B & D & F \\
+0 & 0 & 1 \\
+\end{bmatrix} \begin{bmatrix}
+x_0 \\ y_0 \\ 1
+\end{bmatrix} = \begin{bmatrix}
+A \times x_0 + C \times y_0 + E \times 1 \\
+B \times x_0 + D \times y_0 + F \times 1 \\
+0 \times x_0 + 0 \times y_0 + 1 \times 1
+\end{bmatrix}
+
+This is an /affine transformation/. If we used only $A,B,C,D$, this would be a /linear transformation/.  
+
+** Basic affine transformations
+   
++ Identity (no transformation): ~matrix(1 0 0 1 0 0)~
+  \begin{bmatrix} 1 & 0 & 0 \\ 0 & 1 & 0 \\ 0 & 0 & 1 \end{bmatrix}
++ Translation: ~matrix(0 0 0 0 T_x T_y)~
+  \begin{bmatrix} 0 & 0 & T_x \\ 0 & 0 & T_y \\ 0 & 0 & 1 \end{bmatrix}
++ Scaling: ~matrix(S_x 0 0 S_y 0 0)~
+  \begin{bmatrix}S_x & 0 & 0 \\ 0 & S_y & 0 \\ 0 & 0 & 1 \end{bmatrix}
+
+** More affine transformations
+   
++ Shearing: ~matrix(1 0 k 1 0 0)~ or ~matrix(1 k 0 1 0 0)~ for horizontal and vertical shearing respectively.
+ 
+  \begin{bmatrix} 1 & k & 0 \\ 0 & 1 & 0 \\ 0 & 0 & 1 \end{bmatrix}
+  \begin{bmatrix} 1 & 0 & 0 \\ k & 1 & 0 \\ 0 & 0 & 1 \end{bmatrix}
+
++ Rotation: $matrix(\cos(\alpha) \, -\mkern-6mu\sin(\alpha) \, \sin(\alpha) \, \cos(\alpha) \, 0 \, 0)$ for counterclockwise.
+
+  \begin{bmatrix} \cos(\alpha) & \sin(\alpha) & 0 \\ -\sin(\alpha) & \cos(\alpha) & 0 \\ 0 & 0 & 1 \end{bmatrix}
+  
+  Flip signs on $\sin(\alpha)$ for clockwise. This rotates around the coordinate origin point $(0, 0)$ in the /positive/ direction.
+
+** SVG already has that, duh
+   
+All these obviously have their own ~transform~ attribute notation
++ Translation: ~translate(x, y)~
++ Scaling: ~scale(f)~ or ~scale(f_x, f_y)~
++ Shearing: ~skewX(angle)~ and ~skewY(angle)~. In the matrix form, $k = \cot(\alpha)$
++ Rotation: ~rotate(angle)~ or ~rotate(angle origin_x origin_y)~
+
+There is also a CSS attribute =transform: transform-list= which uses a deceptively similar (but not entirely compatible) syntax. W-o-f does not use it.
+   
+** Why so complicated?
+
+W-o-f only uses rotation. So I started replacing matrix-based rotations with SVG =rotate= while making these slides, and it works fine.
+
+# https://tex.stackexchange.com/a/279455
+\begin{tikzpicture}[baseline,x=0.8\ht\strutbox,y=0.8\ht\strutbox,line width=0.125ex,#1]
+\def\arm{(-2.5,0.95) to (-2,0.95) (-1.9,1) to (-1.5,0) (-1.35,0) to (-0.8,0)};
+\draw \arm;
+\draw[xscale=-1] \arm;
+\def\headpart{(0.6,0) arc[start angle=-40, end angle=40,x radius=0.6,y radius=0.8]};
+\draw \headpart;
+\draw[xscale=-1] \headpart;
+\def\eye{(-0.075,0.15) .. controls (0.02,0) .. (0.075,-0.15)};
+\draw[shift={(-0.3,0.8)}] \eye;
+\draw[shift={(0,0.85)}] \eye;
+% draw mouth
+\draw (-0.1,0.2) to [out=15,in=-100] (0.4,0.95); 
+\end{tikzpicture}
+
+* Spinning the wheel
+  
+** Multiple sectors
+
+Note that the Y axis goes /down/ now, as it does in the SVG coordinate system. This results in the /positive/ direction now being clockwise.
+   
+\begin{tikzpicture}[scale=2]
+\draw [->] (-1, 0) -- (1, 0);
+\draw [->] (0, 1) -- (0, -1);
+\coordinate (O) at (0, 0);
+\pgfmathsetmacro{\sectorangle}{360/13}
+\foreach \a in {0,\sectorangle,...,360} {
+  \draw [dashed] (\a:1) arc[start angle=\a, end angle={\a + \sectorangle}, radius=1];
+  \draw [dashed] (O) -- (\a:1);
+}
+\draw ({-\sectorangle/2}:1) node[anchor=west] {1st sector};
+\draw ({-\sectorangle*1.5}:1) node[anchor=west] {2nd sector};
+\draw ({\sectorangle/2}:1) node[anchor=west] {last sector};
+\end{tikzpicture}
+
+** Orientation
+
+But the first (or /current/ sector) should be pointed *up*.  The wheel is rotated in the /negative/ (clockwise) direction by adding a /bias/ value.
+
+$$\texttt{bias} = - \left( \frac{\pi}{2} + \frac{\alpha}{2} \right) = - \frac{\pi}{2} - \frac{\pi}{N}$$
+
+\begin{tikzpicture}[scale=2]
+\draw [->] (-1, 0) -- (1, 0);
+\draw [->] (0, 1) -- (0, -1);
+\coordinate (O) at (0, 0);
+\pgfmathsetmacro{\sectorangle}{360/13}
+\pgfmathsetmacro{\sectorbias}{90 + \sectorangle/2}
+\foreach \a in {0,\sectorangle,...,360} {
+  \draw [dashed] ({\sectorbias + \a}:1) arc[start angle={\sectorbias + \a}, end angle={\sectorbias + \a + \sectorangle}, radius=1];
+  \draw [dashed] (O) -- ({\a + \sectorbias}:1);
+}
+\draw ({\sectorbias-\sectorangle/2}:1) node[anchor=south] {1st sector};
+\draw ({\sectorbias-\sectorangle*1.5}:1) node[anchor=south west] {2nd sector};
+\draw ({\sectorbias+\sectorangle/2}:1) node[anchor=south east] {last sector};
+\end{tikzpicture}
+
+** Reaching the target sector
+
+To rotate the wheel such that sector $k$ (numbered from 1) is at the top:
+
+$$
+\tau = \texttt{bias} - (k - 1) \alpha
+$$
+
+For a 21-sector wheel (the default), $\alpha \approx 0.29$ and $\texttt{bias} \approx -1.72$.
+Sectors 17-21 result in a rotation value that is less than $-2 \pi$.
+For example, sector 18:
+$$
+\tau = -\frac{\pi}{2} - \frac{\pi}{21} - 17 \frac{2\pi}{21} = -\frac{21\pi}{42} - \frac{2\pi}{42} - \frac{17 \cdot 4 \pi}{42} = -\frac{91\pi}{42}
+$$
+
+* Animations
+
+** Wind-up, full spin, braking
+
+#+BEGIN_SRC xml
+     <animateTransform attributeName="transform" type="rotate"
+                       from="CURRENT" to="-360"
+                       begin="indefinite" dur="2000ms"
+                       id="initialSpin" />
+     <animateTransform attributeName="transform" type="rotate"
+                       from="0" to="-360"
+                       begin="initialSpin.end" dur="2000ms"
+                       id="fullRotations" />
+     <animateTransform attributeName="transform" type="rotate"
+                       from="0" to="TARGET"
+                       begin="fullRotations.end" dur="DURATION"
+                       fill="freeze"
+                       onend="SPIN_COMPLETE()" />
+#+END_SRC
+
+** Restating the TL;DR
+
+Some spin positions are beyond -360° ($-2\pi$). When the spin animation starts, it rolls the wheel 
+to the -360 position. Next, it does a single, fast full spin, followed by settling on the target angle.
+
+When that starting position is e.g. -447°, the initial spin is to the right, not left.
+
+** Q.E.D.
+
+Thanks for sticking through the boring math.
+
+** This presentation was made in Org-Mode
+
++ Emacs 28
++ [[https://orgmode.org/][org-mode]] 9.4.4
++ built-in [[https://orgmode.org/worg/exporters/beamer/tutorial.html][Beamer export]]
++ all pictures hand-coded in [[https://github.com/pgf-tikz/pgf][tikz]]
++ [[https://github.com/rebased/wheel-of-fortune/WHY_DOES_IT_SPIN_RIGHT.org]]
