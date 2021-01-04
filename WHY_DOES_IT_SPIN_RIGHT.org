@@ -3,14 +3,17 @@
 #+EMAIL: krzysztof.zych@rebased.pl
 #+DATE: 2020-01-03
 #+LANGUAGE: en
-#+OPTIONS: toc:f tex:t latex:t ::t date:f H:2
-#+startup: beamer
-#+latex_compiler: xelatex
-#+latex_class: beamer
-#+latex_header: \usepackage{amsmath}
-#+latex_header: \usepackage{tikz}
-#+latex_header: \mode<beamer>{\usetheme{metropolis}}
-# (eval setq org-preview-latex-default-process 'dvisvgm)
+#+OPTIONS: toc:nil tex:t latex:t ::t date:nil H:2
+#+STARTUP: beamer
+#+LATEX_COMPILER: xelatex
+#+LATEX_CLASS: beamer
+#+LATEX_CLASS_OPTIONS: [aspectratio=1610]
+#+LATEX_HEADER: \usepackage{amsmath}
+#+LATEX_HEADER: \usepackage{tikz}
+#+LATEX_HEADER: \usepackage{minted}
+#+LATEX_HEADER: \hypersetup{colorlinks,linkcolor=,urlcolor=gray}
+#+BEAMER_THEME: metropolis
+  
 
 * TL;DR
 ** Executive summary, or I've only got 2 minutes for this
@@ -52,7 +55,9 @@ The long story follows.
 
 ** Our viewBox is a unit square
 
-~<svg viewBox="-1 -1 2 2">~
+#+BEGIN_SRC xml
+<svg viewBox="-1 -1 2 2">
+#+END_SRC
 
 \begin{tikzpicture}[scale=2]
 \draw [->] (-1, 0) -- (1, 0);
@@ -68,12 +73,12 @@ The long story follows.
 \draw [dashed] (-1, -1) -- (-1, 1) -- (1, 1) -- (1, -1) -- cycle;
 \end{tikzpicture}
 
-Well, almost. In the world of 2D computer graphics, the X axis actually goes down, not up.
+Well, almost. In the world of 2D computer graphics, the Y axis actually goes down, not up.
 So our coordinate system is actually flipped: the point at $(-1, -1)$ is in the top-left corner. 
 
 ** A single sector
 
-\begin{tikzpicture}[scale=2]
+\begin{tikzpicture}[scale=3]
 \draw [->] (-1, 0) -- (1, 0);
 \draw [->] (0, -1) -- (0, 1);
 \draw (-1, 0) node [anchor=north west] {$-1$};
@@ -82,7 +87,7 @@ So our coordinate system is actually flipped: the point at $(-1, -1)$ is in the 
 \draw (0, 1) node [anchor=north east] {$1$};
 
 \draw (0, 0) -- (1, 0) arc[start angle=0, end angle=30, radius=1] -- cycle;
-\draw (0.5, 0.0) node [anchor=south] {$\alpha = \frac{2 \pi}{N}$};
+\draw (0.2, 0) node [rotate=30, right=8pt] {$\alpha = \frac{2 \pi}{N}$};
 \draw (0, 0) -- node [anchor=north] {$\cos(\alpha)$} (30:1 |- 0,0) [thick];
 \draw (30:1) -- node [anchor=west] {$\sin(\alpha)$} (30:1 |- 0,0) [thick];
 \end{tikzpicture}
@@ -239,6 +244,7 @@ $$
 
 ** Wind-up, full spin, braking
 
+#+ATTR_LATEX:
 #+BEGIN_SRC xml
      <animateTransform attributeName="transform" type="rotate"
                        from="CURRENT" to="-360"
@@ -266,10 +272,26 @@ When that starting position is e.g. -447°, the initial spin is to the right, no
 
 Thanks for sticking through the boring math.
 
-** This presentation was made in Org-Mode
+* Appendix
+   :PROPERTIES:
+   :BEAMER_ENV: appendix
+   :END:
 
+** This presentation was made in Org-Mode
+   
 + Emacs 28
-+ [[https://orgmode.org/][org-mode]] 9.4.4
-+ built-in [[https://orgmode.org/worg/exporters/beamer/tutorial.html][Beamer export]]
-+ all pictures hand-coded in [[https://github.com/pgf-tikz/pgf][tikz]]
-+ [[https://github.com/rebased/wheel-of-fortune/WHY_DOES_IT_SPIN_RIGHT.org]]
++ [[https://orgmode.org/][_org-mode_]] 9.4.4
++ built-in [[https://orgmode.org/worg/exporters/beamer/tutorial.html][_Beamer export_]]
++ all pictures hand-coded in [[https://github.com/pgf-tikz/pgf][_tikz_]]
++ [[https://github.com/rebased/wheel-of-fortune/WHY_DOES_IT_SPIN_RIGHT.org][_github.com/rebased/wheel-of-fortune_]]
+
+* SETTINGS :noexport:
+# Local Variables:
+# org-preview-latex-default-process: dvisvgm
+# org-latex-listings: minted
+# eval: (setq org-latex-packages-alist '(("" "minted"))
+#             org-latex-pdf-process '(
+#                "pdflatex -shell-escape -interaction nonstopmode -output-directory %o %f"
+#                "pdflatex -shell-escape -interaction nonstopmode -output-directory %o %f"
+#                "pdflatex -shell-escape -interaction nonstopmode -output-directory %o %f"))
+# END:
